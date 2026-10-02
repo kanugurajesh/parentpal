@@ -1,0 +1,22 @@
+{
+  "name": "parentpal",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "setup": "npm run db:up && npm run -w @parentpal/api db:migrate && npm run -w @parentpal/api db:seed",
+    "dev": "npm run setup && concurrently -n api,app -c blue,magenta \"npm run -w @parentpal/api dev\" \"npm run -w @parentpal/mobile start\"",
+    "dev:web": "npm run setup && concurrently -n api,web -c blue,magenta \"npm run -w @parentpal/api dev\" \"npm run -w @parentpal/mobile web\"",
+    "test": "npm run db:up && npm run -w @parentpal/api test",
+    "eval": "npm run -w @parentpal/api eval",
+    "typecheck": "npm run -ws --if-present typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

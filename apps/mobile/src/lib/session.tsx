@@ -1,0 +1,88 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AuthResponse, Me } from "@parentpal/shared";
+import { api, ApiError, setToken } from "./api";
+import { storage } from "./storage";
+
+const TOKEN_KEY = "parentpal.token";
+
+interface SessionValue {
+  ready: boolean;
+  hasSession: boolean;
+  me: Me | undefined;
+  meLoading: boolean;
+  signIn: (auth: AuthResponse) => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshMe: () => Promise<unknown>;
+}
+
+const SessionContext = createContext<SessionValue | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient();
+  const [ready, setReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    storage.get(TOKEN_KEY).then((t) => {
+      setToken(t);
+      setHasSession(!!t);
+      setReady(true);
+    });
+  }, []);
+
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: api.me,
+    enabled: ready && hasSession,
+    retry: (count, err) => !(err instanceof ApiError && err.status === 401) && count < 2,
+  });
+
+  const signOut = useCallback(async () => {
+    await storage.remove(TOKEN_KEY);
+    setToken(null);
+    setHasSession(false);
+    qc.clear();
+  }, [qc]);
+
+  // A deleted or expired profile: drop the token and start over.
+  useEffect(() => {
+    if (meQuery.error instanceof ApiError && meQuery.error.status === 401) void signOut();
+  }, [meQuery.error, signOut]);
+
+  const signIn = useCallback(
+    async (auth: AuthResponse) => {
+      await storage.set(TOKEN_KEY, auth.token);
+      setToken(auth.token);
+      qc.clear();
+      setHasSession(true);
+    },
+    [qc],
+  );
+
+  const value = useMemo<SessionValue>(
+    () => ({
+      ready,
+      hasSession,
+      me: meQuery.data,
+      meLoading: meQuery.isLoading,
+      signIn,
+      signOut,
+      refreshMe: () => qc.invalidateQueries({ queryKey: ["me"] }),
+    }),
+    [ready, hasSession, meQuery.data, meQuery.isLoading, signIn, signOut, qc],
+  );
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function useSession() {
+  const v = useContext(SessionContext);
+  if (!v) throw new Error("useSession must be used inside SessionProvider");
+  return v;
+}
+
+/** The child the app is focused on (first one for now). */
+export function usePrimaryChild() {
+  const { me } = useSession();
+  return me?.children[0] ?? null;
+}

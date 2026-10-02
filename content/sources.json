@@ -1,0 +1,72 @@
+[
+  {
+    "id": "aap-tantrums",
+    "title": "Top Tips for Surviving Tantrums",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/family-dynamics/communication-discipline/Pages/Temper-Tantrums.aspx",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "aap-picky",
+    "title": "10 Tips for Parents of Picky Eaters",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/ages-stages/toddler/nutrition/Pages/Picky-Eaters.aspx",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "aap-sleep",
+    "title": "Healthy Sleep Habits: How Many Hours Does Your Child Need?",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/healthy-living/sleep/Pages/healthy-sleep-habits-how-many-hours-does-your-child-need.aspx",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "aasm-2016",
+    "title": "Recommended Amount of Sleep for Pediatric Populations: A Consensus Statement (Paruthi et al., J Clin Sleep Med, 2016)",
+    "publisher": "American Academy of Sleep Medicine",
+    "url": "https://doi.org/10.5664/jcsm.5866",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "nhs-tantrums",
+    "title": "Temper tantrums",
+    "publisher": "NHS",
+    "url": "https://www.nhs.uk/conditions/baby/babys-development/behaviour/temper-tantrums/",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "nhs-fussy",
+    "title": "Fussy eaters",
+    "publisher": "NHS",
+    "url": "https://www.nhs.uk/conditions/baby/weaning-and-feeding/fussy-eaters/",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "cdc-emotions",
+    "title": "Tips for Noticing and Naming Emotions",
+    "publisher": "CDC, Essentials for Parenting Toddlers",
+    "url": "https://www.cdc.gov/parenting-toddlers/noticing-and-naming/emotion-coaching.html",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "cdc-routines",
+    "title": "Tips for Relying on Routines and Rules",
+    "publisher": "CDC, Essentials for Parenting Toddlers",
+    "url": "https://www.cdc.gov/parenting-toddlers/structure-rules/index.html",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "cdc-time-in",
+    "title": "How to Use Time-In",
+    "publisher": "CDC, Essentials for Parenting Toddlers",
+    "url": "https://www.cdc.gov/parenting-toddlers/responding-to-behavior/time-in.html",
+    "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "cdc-act-early",
+    "title": "Learn the Signs. Act Early.",
+    "publisher": "CDC",
+    "url": "https://www.cdc.gov/act-early/index.html",
+    "accessedOn": "2026-10-02"
+  }
+]
