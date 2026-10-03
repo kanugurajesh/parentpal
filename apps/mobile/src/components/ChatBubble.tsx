@@ -11,21 +11,94 @@ import { SafetyCard } from "./SafetyCard";
 import { Chip, Disclaimer, IconButton, T, styles as ui } from "./ui";
 
 /** Renders "[1]" markers as small superscript-style tags that match the source list below. */
+function withCitations(text: string, keyPrefix: string) {
+  return text.split(/(\[\d+\])/g).map((p, i) =>
+    /^\[\d+\]$/.test(p) ? (
+      <T key={`${keyPrefix}-${i}`} variant="tiny" color={color.moss} style={{ fontFamily: typeScale.smallStrong.fontFamily }}>
+        {` ${p.slice(1, -1)} `}
+      </T>
+    ) : (
+      p
+    ),
+  );
+}
+
+/**
+ * The small slice of Markdown models actually produce in chat: **bold**, *italic*, `code`.
+ * Italic and code render as plain text (the body font has no italic face). Unclosed markers,
+ * e.g. mid-stream, are dropped rather than shown as raw asterisks.
+ */
+function inline(text: string, key: string) {
+  return text.split(/(\*\*[^*\n]+?\*\*)/g).map((p, i) => {
+    const k = `${key}-${i}`;
+    if (/^\*\*.+\*\*$/.test(p)) {
+      return (
+        <T key={k} style={{ fontFamily: typeScale.bodyStrong.fontFamily }}>
+          {withCitations(p.slice(2, -2), k)}
+        </T>
+      );
+    }
+    const clean = p
+      .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\w)/g, "$1$2")
+      .replace(/`([^`\n]+)`/g, "$1")
+      .replace(/\*\*/g, "");
+    return withCitations(clean, k);
+  });
+}
+
+type Block = { kind: "para"; text: string } | { kind: "heading"; text: string } | { kind: "item"; marker: string; text: string };
+
+function parseBlocks(text: string): Block[] {
+  const blocks: Block[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    let m: RegExpMatchArray | null;
+    if (!line.trim()) {
+      blocks.push({ kind: "para", text: "" });
+    } else if ((m = line.match(/^\s{0,3}#{1,6}\s+(.*)$/))) {
+      blocks.push({ kind: "heading", text: m[1] });
+    } else if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
+      blocks.push({ kind: "item", marker: "•", text: m[1] });
+    } else if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)$/))) {
+      blocks.push({ kind: "item", marker: `${m[1]}.`, text: m[2] });
+    } else {
+      const prev = blocks[blocks.length - 1];
+      // Consecutive plain lines stay one paragraph, keeping the model's line breaks.
+      if (prev?.kind === "para" && prev.text) prev.text += `\n${line}`;
+      else blocks.push({ kind: "para", text: line });
+    }
+  }
+  // Blank lines only separate blocks; the gap between Views provides the spacing.
+  return blocks.filter((b) => b.kind !== "para" || b.text);
+}
+
 function AnswerText({ text }: { text: string }) {
-  const parts = text.split(/(\[\d+\])/g);
+  const blocks = parseBlocks(text);
   return (
-    <T>
-      {parts.map((p, i) =>
-        /^\[\d+\]$/.test(p) ? (
-          <T key={i} variant="tiny" color={color.moss} style={{ fontFamily: typeScale.smallStrong.fontFamily }}>
-            {` ${p.slice(1, -1)} `}
-          </T>
+    <View style={{ gap: space.sm }}>
+      {blocks.map((b, i) =>
+        b.kind === "item" ? (
+          <View key={i} style={{ flexDirection: "row", gap: space.sm, paddingLeft: space.xs }}>
+            <T style={{ minWidth: 16 }}>{b.marker}</T>
+            <T style={{ flex: 1 }}>{inline(b.text, `b${i}`)}</T>
+          </View>
         ) : (
-          p
+          <T key={i} variant={b.kind === "heading" ? "bodyStrong" : "body"}>
+            {inline(b.text, `b${i}`)}
+          </T>
         ),
       )}
-    </T>
+    </View>
   );
+}
+
+/** Copy/share text: no citation markers or Markdown syntax. */
+function toPlain(text: string) {
+  return text
+    .replace(/\s?\[\d+\]/g, "")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^(\s*)[-*]\s+/gm, "$1• ")
+    .replace(/\*\*|`/g, "");
 }
 
 function Caret() {
@@ -106,7 +179,7 @@ export function AssistantBubble({
   optionsDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const plain = message.content.replace(/\s?\[\d+\]/g, "");
+  const plain = toPlain(message.content);
 
   if (message.kind === "safety" && message.safety) {
     return (

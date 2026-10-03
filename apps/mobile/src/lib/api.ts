@@ -36,6 +36,8 @@ function resolveBaseUrl() {
   return Platform.OS === "android" ? "http://10.0.2.2:4000" : "http://localhost:4000";
 }
 export const API_URL = resolveBaseUrl();
+/** ngrok's free tier serves a browser warning page unless this header is present. */
+const TUNNEL_HEADERS: Record<string, string> = API_URL.includes("ngrok") ? { "ngrok-skip-browser-warning": "1" } : {};
 
 let token: string | null = null;
 export const setToken = (t: string | null) => {
@@ -57,6 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     res = await fetch(`${API_URL}/v1${path}`, {
       method,
       headers: {
+        ...TUNNEL_HEADERS,
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -117,7 +120,7 @@ export async function streamChat(
 ) {
   const res = await expoFetch(`${API_URL}/v1/chat/messages`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...TUNNEL_HEADERS, "Content-Type": "application/json", Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(input),
     signal,
   });

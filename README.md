@@ -22,27 +22,66 @@ This is a portfolio MVP. It covers one working path through the app from start t
 
 ## Architecture
 
+An npm-workspaces monorepo: one Expo app, one Fastify API, one shared schema package, Postgres, and an LLM behind a small provider interface.
+
 ```
-┌──────────────────────────┐        HTTPS/JSON + SSE         ┌──────────────────────────────┐
-│ apps/mobile (Expo, TS)   │ ──────────────────────────────▶ │ apps/api (Fastify, TS)       │
-│ expo-router, bottom tabs │   Bearer JWT (guest or user)    │  zod-validated routes        │
-│ react-query, expo/fetch  │ ◀────────────────────────────── │  services: retrieval, safety │
-└──────────────────────────┘     text/event-stream (chat)    │  llm/ (provider-agnostic)    │
-                                                             │  jobs/ daily-tip (node-cron) │
-          packages/shared (zod schemas + types) ◀────────────┤  Drizzle ORM + migrations    │
-                                                             └──────────────┬───────────────┘
-                                                                            │
-                          content/goals/*.md ──seed──▶  Postgres 16 (docker compose)
-                                                         FTS (tsvector) for retrieval
+ ┌───────────────────────────────┐                         ┌──────────────────────────────────────────┐
+ │ apps/mobile  (Expo / RN, TS)  │   HTTPS JSON  /v1/*     │ apps/api  (Fastify 5, TS)                │
+ │                               │ ──────────────────────▶ │                                          │
+ │ app/        expo-router       │   Bearer JWT            │ routes/    auth · me · goals · story ·   │
+ │             screens + tabs    │   (guest or user)       │            chat · notifications · admin  │
+ │ lib/api.ts  fetch + SSE       │                         │            (zod-validated in and out)    │
+ │ lib/session token storage     │ ◀────────────────────── │ services/  safety → retrieval → chat     │
+ │ react-query cache             │   text/event-stream     │            story · context · dailyTips   │
+ │ ChatBubble  Markdown + [n]    │   (chat answers)        │ llm/       complete · stream · json<T>   │
+ │             citation render   │                         │            + per-call cost/latency log   │
+ └───────────────┬───────────────┘                         │ jobs/      daily tip (node-cron)         │
+                 │                                         │ db/        Drizzle ORM + migrations      │
+                 │      packages/shared                    └─────┬───────────────────────┬────────────┘
+                 └────▶ zod schemas + TS types ◀─────────────────┘                       │
+                                                                 │ SQL                   │ OpenAI SDK
+                                                                 ▼                       ▼
+                         content/goals/*.md ──seed──▶  ┌──────────────────┐   ┌──────────────────────────┐
+                         content/sources.json          │ Postgres 16      │   │ LLM provider             │
+                                                       │ (docker compose) │   │  groq   → api.groq.com   │
+                                                       │ tsvector FTS     │   │  openai → any compatible │
+                                                       └──────────────────┘   │  mock   → offline/tests  │
+                                                                              └──────────────────────────┘
 ```
 
 | Path | Contents |
 |---|---|
 | `apps/api` | Fastify API: routes, services (chat, retrieval, safety, story, daily tips), LLM adapters, Drizzle schema and migrations, seed script, tests, eval runner |
 | `apps/mobile` | Expo / React Native app (iOS, Android, web) using expo-router |
-| `packages/shared` | zod schemas and TypeScript types shared by the API and the app |
+| `packages/shared` | zod schemas and TypeScript types shared by the API and the app, so request/response shapes can't drift |
 | `content/` | Goals and wins as Markdown, plus `sources.json`. See [`content/README.md`](content/README.md). |
 | `evals/` | Eval cases (`cases.json`) and run results |
+| `scripts/tunnel-api.mjs` | Exposes the local API on an ngrok static domain for testing on a real phone |
+
+### API layers
+
+Requests flow **route → service → db / llm**:
+
+- **Routes** (`apps/api/src/routes`) handle HTTP only: auth (`requireUser`), zod validation and response shaping. Everything is mounted under `/v1`.
+- **Services** (`apps/api/src/services`) hold the product logic: `safety` (red-flag rules), `retrieval` (Postgres FTS over content chunks), `context` (child age, goals and recent moments the LLM may see), `chat` (clarify / answer / citation validation), `story` (moment tagging, pattern insights) and `dailyTips`.
+- **LLM** (`apps/api/src/llm`) is the only code that talks to a model. Every call states a `purpose` and a deterministic `mock()` output, and is logged to `llm_calls`.
+- **DB** (`apps/api/src/db`) is the Drizzle schema plus SQL migrations. Every user-owned table cascades from `users`.
+
+### Data model
+
+| Group | Tables |
+|---|---|
+| Accounts | `users`, `children`, `subscriptions` |
+| Content | `goals`, `wins`, `sources`, `content_chunks`, `user_goals` |
+| Story | `moments`, `patterns`, `pattern_moments` |
+| Chat | `conversations`, `messages`, `message_feedback`, `bookmarks` |
+| Ops | `notifications`, `llm_calls`, `safety_events` |
+
+### Mobile app
+
+- **Routing:** `expo-router` with file-based routes in `apps/mobile/src/app`. Tabs are Home, Story, Ask, Notifications and Profile; onboarding, goal detail, paywall, bookmarks and settings are stack screens.
+- **Data:** `lib/api.ts` wraps `fetch` for JSON calls and `expo/fetch` for the chat SSE stream. Server state is cached with react-query, and the JWT lives in secure storage (`lib/session.tsx`).
+- **Chat rendering:** `ChatBubble` renders the small slice of Markdown models produce (bold, bullet and numbered lists, headings) with the app's own fonts, and turns `[n]` markers into citation tags that match the "Based on" source list. Copy/share strips the Markdown.
 
 ### How the chat answers a message
 
@@ -54,10 +93,13 @@ This is a portfolio MVP. It covers one working path through the app from start t
 
 ### LLM providers
 
-`apps/api/src/llm/` exposes `complete()`, `stream()` and `json<T>(schema)` with two adapters:
+`apps/api/src/llm/` exposes `complete()`, `stream()` and `json<T>(schema)` with three adapters behind one `LLMProvider` interface:
 
-- **`openai`**: used when `OPENAI_API_KEY` is set. Works with any OpenAI-compatible endpoint via `OPENAI_BASE_URL`.
+- **`groq`** (default for real answers): used when `GROQ_API_KEY` is set. Reuses the OpenAI adapter pointed at Groq's OpenAI-compatible API (`https://api.groq.com/openai/v1`), default model `openai/gpt-oss-120b` (`GROQ_MODEL`). gpt-oss always reasons, so keep `LLM_REASONING_EFFORT=low` and some `LLM_THINKING_TOKEN_HEADROOM` so reasoning doesn't use up the small per-call caps.
+- **`openai`**: used when `OPENAI_API_KEY` is set (and no Groq key). Works with any OpenAI-compatible endpoint via `OPENAI_BASE_URL`.
 - **`mock`**: deterministic and template-based. It is used when no key is set and always in tests, so the whole app runs offline at no cost.
+
+Set `LLM_PROVIDER` to force one. Each row in `llm_calls` records the provider, model, purpose, tokens, latency and cost, and `GET /v1/admin/costs` summarizes them.
 
 ## Getting started
 
@@ -65,14 +107,14 @@ This is a portfolio MVP. It covers one working path through the app from start t
 
 - Node.js 22+ (scripts use `--env-file-if-exists`)
 - Docker (for Postgres)
-- Optional: an OpenAI API key. Without one the app uses the mock LLM.
+- Optional: a [Groq API key](https://console.groq.com/keys) (or an OpenAI key). Without one the app uses the mock LLM.
 - Optional: Expo Go on a phone, or an Android/iOS emulator
 
 ### Setup
 
 ```bash
 npm install
-cp .env.example .env      # set JWT_SECRET; add OPENAI_API_KEY for real answers
+cp .env.example .env      # set JWT_SECRET; add GROQ_API_KEY for real answers
 npm run dev               # Postgres + migrate + seed + API + Expo
 ```
 
@@ -84,7 +126,10 @@ For the browser only:
 npm run dev:web
 ```
 
-To test on a physical phone, set `EXPO_PUBLIC_API_URL` in `.env` to your machine's LAN IP (for example `http://192.168.1.20:4000`), because `localhost` on the phone is the phone itself.
+To test on a physical phone, the app needs a URL for the API that the phone can reach, because `localhost` on the phone is the phone itself. Expo only reads env files from `apps/mobile`, so set it in `apps/mobile/.env.local`:
+
+- **Same Wi-Fi:** `EXPO_PUBLIC_API_URL=http://<your LAN IP>:4000` and run `npm run dev`.
+- **Any network (ngrok):** put `NGROK_AUTHTOKEN` and a free static `NGROK_DOMAIN` in the root `.env`, set `EXPO_PUBLIC_API_URL=https://<NGROK_DOMAIN>`, then run `npm run dev:tunnel`. It starts the API, an ngrok tunnel to it, and Expo in `--tunnel` mode. If ngrok reports `ERR_NGROK_334` or Expo says port 8081 is busy, an earlier run is still alive; stop it first.
 
 ### Environment variables
 
@@ -94,11 +139,15 @@ To test on a physical phone, set `EXPO_PUBLIC_API_URL` in `.env` to your machine
 | `DATABASE_URL` / `TEST_DATABASE_URL` | local docker DBs on `5433` | Postgres connections (the test DB is created by `apps/api/db-init`) |
 | `JWT_SECRET` | dev placeholder | Signs auth tokens. **Change it.** |
 | `ADMIN_KEY` | `dev-admin-key` | Required as the `x-admin-key` header on `/v1/admin/*` and `/v1/dev/*` |
-| `LLM_PROVIDER` | auto | `openai` or `mock`. Auto-selects `openai` when a key is present. |
-| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | `gpt-4o-mini` | LLM config |
+| `LLM_PROVIDER` | auto | `groq`, `openai` or `mock`. Auto-selects `groq`, then `openai`, by which key is present. |
+| `GROQ_API_KEY`, `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq config |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | `gpt-4o-mini` | OpenAI or any OpenAI-compatible endpoint |
+| `LLM_REASONING_EFFORT` | empty | Sent as `reasoning_effort` (`low` recommended for gpt-oss) |
+| `LLM_THINKING_TOKEN_HEADROOM` | `0` | Extra output tokens per call for reasoning models (`512` in `.env.example`) |
 | `LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M` | `0.15`, `0.60` | USD per 1M tokens for cost logging. Check against current pricing. |
 | `DAILY_TIP_CRON` | `0 8 * * *` | Daily tip schedule (server local time) |
-| `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | API base URL for the app |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | API base URL for the app (set in `apps/mobile/.env.local`) |
+| `NGROK_AUTHTOKEN`, `NGROK_DOMAIN` | empty | Used by `npm run dev:tunnel` |
 
 ## Scripts
 
@@ -107,6 +156,8 @@ Run from the repo root:
 | Command | What it does |
 |---|---|
 | `npm run dev` / `npm run dev:web` | Full stack (native / web) |
+| `npm run dev:tunnel` | Full stack with the API and Expo exposed through tunnels, for a phone on any network |
+| `npm run tunnel:api` | Only the ngrok tunnel to the local API |
 | `npm run setup` | Start the DB, migrate, seed |
 | `npm run db:up` / `npm run db:down` | Start / stop Postgres |
 | `npm test` | API test suite (vitest against a dockerized test DB, mock LLM) |

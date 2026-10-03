@@ -12,11 +12,14 @@
     "setup": "npm run db:up && npm run -w @parentpal/api db:migrate && npm run -w @parentpal/api db:seed",
     "dev": "npm run setup && concurrently -n api,app -c blue,magenta \"npm run -w @parentpal/api dev\" \"npm run -w @parentpal/mobile start\"",
     "dev:web": "npm run setup && concurrently -n api,web -c blue,magenta \"npm run -w @parentpal/api dev\" \"npm run -w @parentpal/mobile web\"",
+    "tunnel:api": "node --env-file-if-exists=.env scripts/tunnel-api.mjs",
+    "dev:tunnel": "npm run setup && concurrently -n api,ngrok,app -c blue,yellow,magenta \"npm run -w @parentpal/api dev\" \"npm run tunnel:api\" \"npm run -w @parentpal/mobile start -- --tunnel\"",
     "test": "npm run db:up && npm run -w @parentpal/api test",
     "eval": "npm run -w @parentpal/api eval",
     "typecheck": "npm run -ws --if-present typecheck"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "concurrently": "^10.0.5"
   }
 }

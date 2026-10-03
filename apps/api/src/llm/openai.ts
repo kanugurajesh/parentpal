@@ -1,15 +1,26 @@
 import OpenAI from "openai";
 import type { LLMProvider, LLMRequest, LLMResult, LLMUsage } from "./types";
 
+export interface OpenAIProviderOptions {
+  /** Logged as the provider name; lets OpenAI-compatible hosts (e.g. "groq") show up separately. */
+  name?: string;
+  /** Sent as `reasoning_effort` (e.g. "low" for Groq's gpt-oss models to cut latency). */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+  /** Added to each call's token cap so reasoning tokens don't eat the visible answer. */
+  thinkingHeadroom?: number;
+}
+
 export class OpenAIProvider implements LLMProvider {
-  readonly name = "openai";
+  readonly name: string;
   private client: OpenAI;
 
   constructor(
     apiKey: string,
     readonly model: string,
     baseURL?: string,
+    private readonly opts: OpenAIProviderOptions = {},
   ) {
+    this.name = opts.name ?? "openai";
     this.client = new OpenAI({ apiKey, baseURL: baseURL || undefined, timeout: 60_000, maxRetries: 2 });
   }
 
@@ -17,11 +28,18 @@ export class OpenAIProvider implements LLMProvider {
     return [{ role: "system", content: req.system }, ...req.messages];
   }
 
+  private limits(req: LLMRequest) {
+    return {
+      max_completion_tokens: (req.maxTokens ?? 800) + (this.opts.thinkingHeadroom ?? 0),
+      ...(this.opts.reasoningEffort ? { reasoning_effort: this.opts.reasoningEffort } : {}),
+    };
+  }
+
   async complete(req: LLMRequest): Promise<LLMResult> {
     const res = await this.client.chat.completions.create({
       model: this.model,
       messages: this.toMessages(req),
-      max_completion_tokens: req.maxTokens ?? 800,
+      ...this.limits(req),
       ...(req.json ? { response_format: { type: "json_object" as const } } : {}),
     });
     return {
@@ -44,14 +62,14 @@ export class OpenAIProvider implements LLMProvider {
     const client = this.client;
     const model = this.model;
     const messages = this.toMessages(req);
-    const maxTokens = req.maxTokens ?? 800;
+    const limits = this.limits(req);
 
     async function* deltas() {
       try {
         const stream = await client.chat.completions.create({
           model,
           messages,
-          max_completion_tokens: maxTokens,
+          ...limits,
           stream: true,
           stream_options: { include_usage: true },
         });
@@ -59,7 +77,9 @@ export class OpenAIProvider implements LLMProvider {
         for await (const chunk of stream) {
           const text = chunk.choices[0]?.delta?.content;
           if (text) yield text;
-          if (chunk.usage) u = { inputTokens: chunk.usage.prompt_tokens, outputTokens: chunk.usage.completion_tokens };
+          // OpenAI puts usage on the final chunk; Groq may report it under `x_groq.usage` instead.
+          const cu = chunk.usage ?? (chunk as { x_groq?: { usage?: OpenAI.CompletionUsage } }).x_groq?.usage;
+          if (cu) u = { inputTokens: cu.prompt_tokens, outputTokens: cu.completion_tokens };
         }
         resolveUsage(u);
       } catch (err) {

@@ -7,10 +7,21 @@ import type { CallContext, LLMProvider, LLMRequest, LLMUsage } from "./types";
 
 export type { LLMRequest, CallContext } from "./types";
 
+/** Groq speaks the OpenAI chat-completions API, so it reuses the OpenAI adapter. */
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+
 function createProvider(): LLMProvider {
+  const opts = {
+    reasoningEffort: env.LLM_REASONING_EFFORT || undefined,
+    thinkingHeadroom: env.LLM_THINKING_TOKEN_HEADROOM,
+  };
+  if (env.llmProvider === "groq") {
+    if (!env.GROQ_API_KEY) throw new Error("LLM_PROVIDER=groq but GROQ_API_KEY is empty");
+    return new OpenAIProvider(env.GROQ_API_KEY, env.GROQ_MODEL, GROQ_BASE_URL, { ...opts, name: "groq" });
+  }
   if (env.llmProvider === "openai") {
     if (!env.OPENAI_API_KEY) throw new Error("LLM_PROVIDER=openai but OPENAI_API_KEY is empty");
-    return new OpenAIProvider(env.OPENAI_API_KEY, env.OPENAI_MODEL, env.OPENAI_BASE_URL);
+    return new OpenAIProvider(env.OPENAI_API_KEY, env.OPENAI_MODEL, env.OPENAI_BASE_URL, opts);
   }
   return new MockProvider(env.isTest ? 0 : 25);
 }
