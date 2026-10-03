@@ -9,6 +9,7 @@ import { AssistantBubble, UserBubble } from "@/components/ChatBubble";
 import { Icon } from "@/components/Icon";
 import { Button, ErrorNote, Loading, T, styles as ui } from "@/components/ui";
 import { api, streamChat } from "@/lib/api";
+import { confirm } from "@/lib/confirm";
 import { usePrimaryChild } from "@/lib/session";
 import { color, GUTTER, radius, space, type as typeScale } from "@/theme/tokens";
 
@@ -78,6 +79,15 @@ export default function Ask() {
     },
   });
 
+  const clear = useMutation({
+    mutationFn: api.clearChat,
+    onSuccess: (d) => {
+      qc.setQueryData<ChatData>(["chat"], d);
+      setError(null);
+    },
+    onError: (err) => setError((err as Error).message),
+  });
+
   async function send(text: string, clarifies?: string) {
     const t = text.trim();
     if (!t || busy) return;
@@ -136,7 +146,27 @@ export default function Ask() {
         <T variant="h1" accessibilityRole="header">
           Ask
         </T>
-        <Button label={showTopics ? "Hide topics" : "View topics"} kind="ghost" onPress={() => setShowTopics((s) => !s)} />
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {messages.length ? (
+            <Button
+              label="Clear"
+              kind="ghost"
+              loading={clear.isPending}
+              disabled={busy}
+              accessibilityHint="Deletes this chat. Bookmarked answers are kept."
+              onPress={async () => {
+                const ok = await confirm({
+                  title: "Clear this chat?",
+                  message: "The conversation will be deleted and the next question starts fresh. Bookmarked answers stay in Bookmarks.",
+                  confirmLabel: "Clear chat",
+                  tone: "danger",
+                });
+                if (ok) clear.mutate();
+              }}
+            />
+          ) : null}
+          <Button label={showTopics ? "Hide topics" : "View topics"} kind="ghost" onPress={() => setShowTopics((s) => !s)} />
+        </View>
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
         <ScrollView

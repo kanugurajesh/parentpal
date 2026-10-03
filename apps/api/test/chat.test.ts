@@ -74,6 +74,30 @@ describe("chat streaming", () => {
     expect((await app.inject({ method: "GET", url: "/v1/bookmarks", headers: g.auth })).json().messages).toHaveLength(0);
   });
 
+  it("clears the chat but keeps bookmarked replies usable", async () => {
+    const g = await onboarded(app);
+    const kept = (await ask(app, g.auth, "How do I get my picky eater to try vegetables?")).events.at(-1)!;
+    if (kept.type !== "done") throw new Error("no done");
+    await ask(app, g.auth, "bedtime routine ideas for a toddler");
+    await app.inject({ method: "POST", url: `/v1/messages/${kept.message.id}/bookmark`, headers: g.auth });
+
+    const cleared = await app.inject({ method: "DELETE", url: "/v1/chat", headers: g.auth });
+    expect(cleared.statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/chat", headers: g.auth })).json().messages).toEqual([]);
+
+    const marks = (await app.inject({ method: "GET", url: "/v1/bookmarks", headers: g.auth })).json().messages;
+    expect(marks.map((m: { id: string }) => m.id)).toEqual([kept.message.id]);
+    const fb = await app.inject({ method: "POST", url: `/v1/messages/${kept.message.id}/feedback`, headers: g.auth, payload: { rating: 1 } });
+    expect(fb.statusCode).toBe(200);
+
+    // A new question starts from an empty history.
+    await ask(app, g.auth, "How do I get my picky eater to try vegetables?");
+    expect((await app.inject({ method: "GET", url: "/v1/chat", headers: g.auth })).json().messages).toHaveLength(2);
+
+    await app.inject({ method: "DELETE", url: `/v1/messages/${kept.message.id}/bookmark`, headers: g.auth });
+    expect((await app.inject({ method: "GET", url: "/v1/bookmarks", headers: g.auth })).json().messages).toHaveLength(0);
+  });
+
   it("can't rate someone else's message", async () => {
     const a = await onboarded(app);
     const b = await onboarded(app);

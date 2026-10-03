@@ -16,13 +16,16 @@ export default function Profile() {
 
   async function startNew() {
     const guest = user?.isGuest;
-    const ok = await confirm(
-      "Start a new profile?",
-      guest
+    const ok = await confirm({
+      title: "Start a new profile?",
+      message: guest
         ? "This phone will forget the current guest profile. Without an account you won't be able to get back to it."
         : "You'll be signed out. You can sign back in with your email anytime.",
-      "Start new profile",
-    );
+      confirmLabel: "Start new profile",
+      // A guest profile is lost for good; a signed-in one can be recovered.
+      tone: guest ? "danger" : "default",
+      icon: "person",
+    });
     if (!ok) return;
     await signOut();
     router.replace("/onboarding");

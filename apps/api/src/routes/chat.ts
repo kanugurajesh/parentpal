@@ -5,20 +5,20 @@ import { ChatMessage, Feedback, SendMessage, Topic, type ChatStreamEvent } from 
 import { db, schema } from "../db/client";
 import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
-import { getOrCreateConversation, listMessages, runChat, startersFor, toChatMessages, TOPICS } from "../services/chat";
+import { clearChat, listMessages, runChat, startersFor, toChatMessages, TOPICS } from "../services/chat";
 import { loadFamilyContext } from "../services/context";
 
 const MsgParams = z.object({ id: z.string().uuid() });
 
-/** A message belongs to the caller only if it's in their conversation. */
+/** A message belongs to the caller only if it's in one of their conversations (bookmarks outlive a cleared chat). */
 async function ownedMessage(userId: string, messageId: string) {
-  const conv = await getOrCreateConversation(userId);
-  const [m] = await db
-    .select()
+  const [row] = await db
+    .select({ m: schema.messages })
     .from(schema.messages)
-    .where(and(eq(schema.messages.id, messageId), eq(schema.messages.conversationId, conv.id)));
-  if (!m) throw notFound("Message");
-  return m;
+    .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
+    .where(and(eq(schema.messages.id, messageId), eq(schema.conversations.userId, userId)));
+  if (!row) throw notFound("Message");
+  return row.m;
 }
 
 export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
@@ -27,6 +27,12 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get("/chat", { schema: { response: { 200: z.object({ messages: z.array(ChatMessage) }) } } }, async (req) => ({
     messages: await listMessages(req.userId),
   }));
+
+  /** Clears the chat: next messages start a new conversation with no history. Bookmarked replies are kept. */
+  app.delete("/chat", { schema: { response: { 200: z.object({ messages: z.array(ChatMessage) }) } } }, async (req) => {
+    await clearChat(req.userId);
+    return { messages: [] };
+  });
 
   app.get("/chat/starters", { schema: { response: { 200: z.object({ starters: z.array(z.string()) }) } } }, async (req) => {
     const ctx = await loadFamilyContext(req.userId);

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   formatAge,
@@ -35,6 +35,21 @@ export async function getOrCreateConversation(userId: string) {
   if (c) return c;
   const [created] = await db.insert(schema.conversations).values({ userId }).returning();
   return created;
+}
+
+/**
+ * Starts a fresh conversation. Earlier messages are deleted, except bookmarked ones (deleting
+ * those would silently empty the user's bookmarks); old conversations left empty are removed.
+ */
+export async function clearChat(userId: string) {
+  await db.transaction(async (tx) => {
+    const convIds = tx.select({ id: schema.conversations.id }).from(schema.conversations).where(eq(schema.conversations.userId, userId));
+    const bookmarked = tx.select({ id: schema.bookmarks.messageId }).from(schema.bookmarks).where(eq(schema.bookmarks.userId, userId));
+    await tx.delete(schema.messages).where(and(inArray(schema.messages.conversationId, convIds), notInArray(schema.messages.id, bookmarked)));
+    const stillUsed = tx.selectDistinct({ id: schema.messages.conversationId }).from(schema.messages);
+    await tx.delete(schema.conversations).where(and(eq(schema.conversations.userId, userId), notInArray(schema.conversations.id, stillUsed)));
+    await tx.insert(schema.conversations).values({ userId });
+  });
 }
 
 type MessageRow = typeof schema.messages.$inferSelect;

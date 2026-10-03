@@ -16,6 +16,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { DialogHost } from "@/lib/confirm";
 import { SessionProvider, useSession } from "@/lib/session";
 import { installWebStyles } from "@/lib/webStyles";
 import { color } from "@/theme/tokens";
@@ -51,6 +52,7 @@ function Root() {
         <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
         <Stack.Screen name="moment/new" options={{ presentation: "modal" }} />
       </Stack>
+      <DialogHost />
     </>
   );
 }

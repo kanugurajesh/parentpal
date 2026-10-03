@@ -99,6 +99,7 @@ export const api = {
   patterns: () => request<{ patterns: Pattern[] }>("GET", "/patterns"),
 
   chat: () => request<{ messages: ChatMessage[] }>("GET", "/chat"),
+  clearChat: () => request<{ messages: ChatMessage[] }>("DELETE", "/chat"),
   starters: () => request<{ starters: string[] }>("GET", "/chat/starters"),
   topics: () => request<{ topics: Topic[] }>("GET", "/chat/topics"),
   feedback: (id: string, rating: 1 | -1) => request<ChatMessage>("POST", `/messages/${id}/feedback`, { rating }),

@@ -21,7 +21,8 @@ export type IconName =
   | "chevronLeft"
   | "send"
   | "check"
-  | "spark";
+  | "spark"
+  | "trash";
 
 /** Hand-drawn, 24px grid, 1.8 stroke, rounded caps: one consistent icon voice for the app. */
 export function Icon({ name, size = 24, color = c.ink, filled = false }: { name: IconName; size?: number; color?: string; filled?: boolean }) {
@@ -115,6 +116,15 @@ export function Icon({ name, size = 24, color = c.ink, filled = false }: { name:
       break;
     case "spark":
       body = <Path {...s} fill={fillCol} d="M12 3.5c.6 4.1 2.4 5.9 6.5 6.5-4.1.6-5.9 2.4-6.5 6.5-.6-4.1-2.4-5.9-6.5-6.5 4.1-.6 5.9-2.4 6.5-6.5zM18 15.5c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.2-1.5-.9-2.2-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5z" />;
+      break;
+    case "trash":
+      body = (
+        <>
+          <Path {...s} d="M4.5 7h15M9.5 7V5.3c0-.7.6-1.3 1.3-1.3h2.4c.7 0 1.3.6 1.3 1.3V7" />
+          <Path {...s} fill={fillCol} d="M6.5 7l.9 11.6c.1 1 .9 1.9 2 1.9h5.2c1.1 0 1.9-.9 2-1.9L17.5 7" />
+          <Path {...s} d="M10.3 11v5.5M13.7 11v5.5" />
+        </>
+      );
       break;
   }
   return (

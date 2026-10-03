@@ -14,11 +14,14 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
 
   async function deleteAccount() {
-    const ok = await confirm(
-      "Delete your account?",
-      "This permanently deletes your family profile, children, moments, patterns, chats, bookmarks and notifications from our server. This can't be undone.",
-      "Delete everything",
-    );
+    const ok = await confirm({
+      title: "Delete your account?",
+      message:
+        "This permanently deletes your family profile, children, moments, patterns, chats, bookmarks and notifications from our server. This can't be undone.",
+      confirmLabel: "Delete everything",
+      cancelLabel: "Keep my account",
+      tone: "danger",
+    });
     if (!ok) return;
     setBusy(true);
     setError(null);
