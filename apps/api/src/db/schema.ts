@@ -44,6 +44,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   parentRole: parentRole("parent_role"),
   firstName: text("first_name"),
+  /** Daily ideas and reminders. Off: no new tips are created and the app cancels phone alerts. */
+  notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   createdAt: createdAt(),
 });
 

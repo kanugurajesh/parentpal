@@ -4,7 +4,7 @@ import { db, schema } from "../src/db/client";
 import { getProvider, setProvider } from "../src/llm";
 import { MockProvider } from "../src/llm/mock";
 import { detectRedFlag } from "../src/services/safety";
-import { runDailyTips } from "../src/services/dailyTips";
+import { addDays, runDailyTips, todayISO } from "../src/services/dailyTips";
 import { ask, makeApp, onboarded, type App } from "./helpers";
 
 let app: App;
@@ -124,6 +124,60 @@ describe("daily tips job", () => {
 
     const read = await app.inject({ method: "POST", url: `/v1/notifications/${list[0].id}/read`, headers: g.auth });
     expect(read.json().readAt).not.toBeNull();
+  });
+
+  it("gives a new profile today's tip the first time the inbox opens, once", async () => {
+    const g = await onboarded(app, ["sleep"]);
+    const url = `/v1/notifications?today=${todayISO()}`;
+    const first = (await app.inject({ method: "GET", url, headers: g.auth })).json();
+    expect(first.notifications).toHaveLength(1);
+    expect(first.notifications[0]).toMatchObject({ forDate: todayISO(), goalSlug: "sleep" });
+    expect(first.unread).toBe(1);
+    const again = (await app.inject({ method: "GET", url, headers: g.auth })).json();
+    expect(again.notifications.map((n: { id: string }) => n.id)).toEqual([first.notifications[0].id]);
+  });
+
+  it("creates no tips while the user has notifications turned off", async () => {
+    const g = await onboarded(app, ["sleep"]);
+    const off = await app.inject({ method: "PATCH", url: "/v1/me", headers: g.auth, payload: { notificationsEnabled: false } });
+    expect(off.json().notificationsEnabled).toBe(false);
+
+    const today = todayISO();
+    expect((await app.inject({ method: "GET", url: `/v1/notifications?today=${today}`, headers: g.auth })).json().notifications).toEqual([]);
+    expect((await app.inject({ method: "GET", url: `/v1/notifications/upcoming?from=${today}`, headers: g.auth })).json().notifications).toEqual([]);
+    await runDailyTips("2031-03-01");
+    expect(await db.select().from(schema.notifications).where(eq(schema.notifications.userId, g.userId))).toHaveLength(0);
+
+    await app.inject({ method: "PATCH", url: "/v1/me", headers: g.auth, payload: { notificationsEnabled: true } });
+    expect((await app.inject({ method: "GET", url: `/v1/notifications?today=${today}`, headers: g.auth })).json().notifications).toHaveLength(1);
+  });
+
+  it("creates the next days' tips on demand, once, and hides them from the inbox until their day", async () => {
+    const g = await onboarded(app, ["sleep", "tantrums"]);
+    const other = await onboarded(app, ["picky-eating"]);
+    const today = todayISO();
+    const url = `/v1/notifications/upcoming?from=${today}`;
+
+    const first = await app.inject({ method: "GET", url, headers: g.auth });
+    expect(first.statusCode).toBe(200);
+    const tips = first.json().notifications as { id: string; forDate: string; title: string }[];
+    expect(tips.map((t) => t.forDate)).toEqual([today, addDays(today, 1), addDays(today, 2)]);
+    expect(new Set(tips.map((t) => t.title)).size).toBe(3); // a different win each day
+
+    const again = (await app.inject({ method: "GET", url, headers: g.auth })).json().notifications;
+    expect(again.map((t: { id: string }) => t.id)).toEqual(tips.map((t) => t.id));
+    expect(await db.select().from(schema.notifications).where(eq(schema.notifications.userId, g.userId))).toHaveLength(3);
+
+    const inbox = (await app.inject({ method: "GET", url: `/v1/notifications?today=${today}`, headers: g.auth })).json();
+    expect(inbox.notifications.map((n: { id: string }) => n.id)).toEqual([tips[0].id]);
+    expect(inbox.unread).toBe(1);
+
+    const theirs = (await app.inject({ method: "GET", url, headers: other.auth })).json().notifications;
+    expect(theirs.every((t: { id: string }) => !tips.some((m) => m.id === t.id))).toBe(true);
+
+    const far = await app.inject({ method: "GET", url: `/v1/notifications/upcoming?from=${addDays(today, 30)}`, headers: g.auth });
+    expect(far.statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: `${url}&days=10`, headers: g.auth })).statusCode).toBe(400);
   });
 });
 

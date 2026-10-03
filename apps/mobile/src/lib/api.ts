@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
+import { localDateISO } from "./dates";
 import type {
   Advisor,
   AuthResponse,
@@ -106,7 +107,8 @@ export const api = {
   bookmark: (id: string, on: boolean) => request<ChatMessage>(on ? "POST" : "DELETE", `/messages/${id}/bookmark`),
   bookmarks: () => request<{ messages: ChatMessage[] }>("GET", "/bookmarks"),
 
-  notifications: () => request<{ notifications: Notification[]; unread: number }>("GET", "/notifications"),
+  notifications: () => request<{ notifications: Notification[]; unread: number }>("GET", `/notifications?today=${localDateISO()}`),
+  upcomingTips: () => request<{ notifications: Notification[] }>("GET", `/notifications/upcoming?from=${localDateISO()}&days=3`),
   readNotification: (id: string) => request<Notification>("POST", `/notifications/${id}/read`),
 };
 

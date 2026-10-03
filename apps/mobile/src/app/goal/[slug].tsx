@@ -6,9 +6,48 @@ import { GoalArt } from "@/components/GoalArt";
 import { Icon } from "@/components/Icon";
 import { Button, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
+import { addCheckIn, hasPermission, NOTIFICATIONS_SUPPORTED, turnOnNotifications, updatePrefs, useNotificationState } from "@/lib/notifications";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
 
-function WinCard({ win, accent }: { win: Win; accent: string }) {
+/** Commits to trying a win; the next morning a check-in asks how it went (and opens the moment log). */
+function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
+  const { prefs, checkIns } = useNotificationState();
+  if (!NOTIFICATIONS_SUPPORTED) return null;
+  if (checkIns.some((c) => c.winId === win.id)) {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.xs }} accessibilityLiveRegion="polite">
+        <Icon name="check" size={20} color={color.moss} />
+        <T variant="smallStrong" color={color.moss}>
+          Good luck! We'll check in tomorrow morning.
+        </T>
+      </View>
+    );
+  }
+  return (
+    <Button
+      label="I'll try this"
+      kind="secondary"
+      icon="check"
+      accessibilityHint="Sends one reminder tomorrow morning to ask how it went"
+      onPress={async () => {
+        if (!prefs.enabled || !prefs.checkIns || !(await hasPermission())) {
+          const on = await turnOnNotifications({
+            title: "Check in tomorrow?",
+            message: "We'll send one reminder tomorrow morning asking how it went, so you can note it in a line. Those notes are how ParentPal spots patterns.",
+            confirmLabel: "Remind me",
+            cancelLabel: "Not now",
+            icon: "bell",
+          });
+          if (!on) return;
+          if (!prefs.checkIns) await updatePrefs({ checkIns: true });
+        }
+        await addCheckIn(win, goalSlug);
+      }}
+    />
+  );
+}
+
+function WinCard({ win, accent, goalSlug }: { win: Win; accent: string; goalSlug: string }) {
   if (win.locked) {
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, borderRadius: radius.card, backgroundColor: color.paperDeep }}>
@@ -63,6 +102,7 @@ function WinCard({ win, accent }: { win: Win; accent: string }) {
           Based on {win.sources.map((s) => s.publisher.split(" (")[0]).filter((v, i, a) => a.indexOf(v) === i).join(" and ")}
         </T>
       ) : null}
+      <TryThis win={win} goalSlug={goalSlug} />
     </View>
   );
 }
@@ -101,7 +141,7 @@ export default function GoalScreen() {
                   {g.wins.length} wins to try
                 </T>
                 {g.wins.map((w) => (
-                  <WinCard key={w.id} win={w} accent={tone.deep} />
+                  <WinCard key={w.id} win={w} accent={tone.deep} goalSlug={g.slug} />
                 ))}
                 {locked ? (
                   <View style={{ gap: space.sm, marginTop: space.sm }}>

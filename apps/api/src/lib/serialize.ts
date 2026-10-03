@@ -11,6 +11,7 @@ export const toUser = (u: Row<typeof schema.users>): User => ({
   email: u.email,
   parentRole: u.parentRole,
   firstName: u.firstName,
+  notificationsEnabled: u.notificationsEnabled,
   createdAt: iso(u.createdAt),
 });
 

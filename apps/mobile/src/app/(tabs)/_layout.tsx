@@ -3,6 +3,7 @@ import { Redirect, Tabs } from "expo-router";
 import type { ColorValue } from "react-native";
 import { Icon, type IconName } from "@/components/Icon";
 import { api } from "@/lib/api";
+import { useNotificationSync, useNotificationTaps } from "@/lib/notifications";
 import { useSession } from "@/lib/session";
 import { color, font } from "@/theme/tokens";
 
@@ -11,8 +12,10 @@ const icon =
   ({ color: c, focused }: { color: ColorValue; focused: boolean }) => <Icon name={name} size={24} color={c as string} filled={focused && name !== "story"} />;
 
 export default function TabsLayout() {
-  const { hasSession } = useSession();
+  const { hasSession, me } = useSession();
   const notes = useQuery({ queryKey: ["notifications"], queryFn: api.notifications, enabled: hasSession });
+  useNotificationSync(hasSession);
+  useNotificationTaps(hasSession);
   if (!hasSession) return <Redirect href="/onboarding" />;
 
   return (
@@ -34,7 +37,7 @@ export default function TabsLayout() {
         options={{
           title: "Notifications",
           tabBarIcon: icon("bell"),
-          tabBarBadge: notes.data?.unread ? notes.data.unread : undefined,
+          tabBarBadge: notes.data?.unread && me?.user.notificationsEnabled !== false ? notes.data.unread : undefined,
           tabBarBadgeStyle: { backgroundColor: color.apricot, color: color.ink, fontFamily: font.bodyBold },
         }}
       />

@@ -51,6 +51,7 @@ export const User = z.object({
   email: z.string().email().nullable(),
   parentRole: ParentRole.nullable(),
   firstName: z.string().nullable(),
+  notificationsEnabled: z.boolean(),
   createdAt: z.string(),
 });
 export type User = z.infer<typeof User>;
@@ -67,6 +68,7 @@ export type Credentials = z.infer<typeof Credentials>;
 export const UpdateMe = z.object({
   parentRole: ParentRole.optional(),
   firstName: z.string().trim().min(1).max(40).optional(),
+  notificationsEnabled: z.boolean().optional(),
 });
 export type UpdateMe = z.infer<typeof UpdateMe>;
 

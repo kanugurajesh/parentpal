@@ -9,7 +9,8 @@ export interface ConfirmOptions {
   title: string;
   message: string;
   confirmLabel: string;
-  cancelLabel?: string;
+  /** null hides the cancel button, for a plain acknowledgement. */
+  cancelLabel?: string | null;
   /** "danger" for actions that delete or lose data: red icon badge and confirm button. */
   tone?: "default" | "danger";
   icon?: IconName;
@@ -121,7 +122,7 @@ export function DialogHost() {
                 onPress={() => close(true)}
                 style={danger ? { backgroundColor: color.danger, borderColor: color.danger } : undefined}
               />
-              <Button label={req.cancelLabel ?? "Cancel"} kind="secondary" onPress={() => close(false)} />
+              {req.cancelLabel !== null ? <Button label={req.cancelLabel ?? "Cancel"} kind="secondary" onPress={() => close(false)} /> : null}
             </View>
           </Animated.View>
         ) : null}

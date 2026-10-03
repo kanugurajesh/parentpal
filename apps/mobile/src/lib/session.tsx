@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthResponse, Me } from "@parentpal/shared";
 import { api, ApiError, setToken } from "./api";
+import { clearScheduledNotifications } from "./notifications";
 import { storage } from "./storage";
 
 const TOKEN_KEY = "parentpal.token";
@@ -40,6 +41,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await storage.remove(TOKEN_KEY);
+    await clearScheduledNotifications().catch(() => {});
     setToken(null);
     setHasSession(false);
     qc.clear();

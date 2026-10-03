@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import type { CreateMomentResponse } from "@parentpal/shared";
@@ -8,6 +8,7 @@ import { PatternCard } from "@/components/PatternCard";
 import { SafetyCard } from "@/components/SafetyCard";
 import { Button, Chip, ErrorNote, Field, T } from "@/components/ui";
 import { api } from "@/lib/api";
+import { syncNotifications } from "@/lib/notifications";
 import { useSession } from "@/lib/session";
 import { color, space } from "@/theme/tokens";
 
@@ -16,15 +17,18 @@ const PROMPTS = ["What happened just before?", "What did they do?", "How did it 
 export default function NewMoment() {
   const qc = useQueryClient();
   const { me } = useSession();
+  // Set when opened from a "How did it go?" check-in notification.
+  const { tried } = useLocalSearchParams<{ tried?: string }>();
   const kids = me?.children ?? [];
   const [childId, setChildId] = useState(kids[0]?.id ?? "");
-  const [text, setText] = useState("");
+  const [text, setText] = useState(tried ? `Tried "${tried}". ` : "");
   const [result, setResult] = useState<CreateMomentResponse | null>(null);
 
   const save = useMutation({
     mutationFn: () => api.addMoment(childId, text.trim()),
     onSuccess: async (res) => {
       await Promise.all([qc.invalidateQueries({ queryKey: ["moments"] }), qc.invalidateQueries({ queryKey: ["patterns"] })]);
+      void syncNotifications(); // a new moment resets the quiet-days reminder
       if (res.safety || res.newPattern) setResult(res);
       else router.back();
     },
@@ -44,8 +48,12 @@ export default function NewMoment() {
 
   return (
     <OnboardingFrame
-      title="Add a moment"
-      subtitle="A few lines is plenty. Write it the way you'd tell a friend."
+      title={tried ? "How did it go?" : "Add a moment"}
+      subtitle={
+        tried
+          ? "What happened when you tried it? Even \"it didn't work\" is useful: patterns come from both."
+          : "A few lines is plenty. Write it the way you'd tell a friend."
+      }
       footer={
         <>
           {save.error ? <ErrorNote message={(save.error as Error).message} /> : null}

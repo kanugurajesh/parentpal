@@ -38,7 +38,13 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#2E6A4F"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

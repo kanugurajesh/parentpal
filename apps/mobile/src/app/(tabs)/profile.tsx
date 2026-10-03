@@ -73,7 +73,7 @@ export default function Profile() {
           />
           <ListRow icon="share" label="Refer friends" detail="Share ParentPal with another parent" onPress={() => router.push("/refer")} />
           <ListRow icon="ask" label="Help & support" detail={SUPPORT_EMAIL} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=ParentPal%20help`)} />
-          <ListRow icon="home" label="Settings" detail="Privacy and account" onPress={() => router.push("/settings")} />
+          <ListRow icon="home" label="Settings" detail="Notifications, privacy and account" onPress={() => router.push("/settings")} />
         </View>
 
         <View style={{ backgroundColor: color.card, borderRadius: radius.card, overflow: "hidden", borderWidth: 1.5, borderColor: color.line }}>
