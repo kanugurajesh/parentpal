@@ -1,6 +1,6 @@
 import type { PState } from "@/components/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -204,7 +204,7 @@ export default function Ask() {
             </View>
           ) : null}
 
-          {messages.map((m) =>
+          {messages.map((m, i) =>
             m.role === "user" ? (
               <UserBubble key={m.id} text={m.content} />
             ) : (
@@ -215,6 +215,13 @@ export default function Ask() {
                 onPickOption={(o) => send(o, m.id)}
                 onRate={(r) => rate.mutate({ id: m.id, r })}
                 onBookmark={(on) => mark.mutate({ id: m.id, on })}
+                onAskParents={() => {
+                  const question = messages.slice(0, i).reverse().find((x) => x.role === "user")?.content ?? "";
+                  router.push({
+                    pathname: "/post/new",
+                    params: { kind: "question", body: question, ...(m.citations[0] ? { goal: m.citations[0].goalSlug } : {}) },
+                  });
+                }}
               />
             ),
           )}

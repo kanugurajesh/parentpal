@@ -15,6 +15,7 @@ import {
 import { db, schema } from "../db/client";
 import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
+import { winCommunityStats } from "../services/community";
 import { loadMe } from "./me";
 
 export async function isSubscribed(userId: string) {
@@ -107,6 +108,7 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
       const subscribed = await isSubscribed(req.userId);
       const sources = await sourceMap([...new Set([...g.sourceIds, ...wins.flatMap((w) => w.sourceIds)])]);
       const pick = (ids: string[]) => ids.map((id) => sources.get(id)).filter((s): s is Source => !!s);
+      const community = await winCommunityStats(wins.map((w) => w.id));
 
       return {
         slug: g.slug as GoalSlug,
@@ -130,6 +132,7 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
             script: locked ? null : w.script,
             whatToExpect: locked ? null : w.whatToExpect,
             sources: pick(w.sourceIds),
+            community: community.get(w.id) ?? null,
           };
         }),
       };

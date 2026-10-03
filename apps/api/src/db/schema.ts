@@ -27,7 +27,12 @@ export const subStatus = pgEnum("sub_status", ["active_fake", "canceled"]);
 export const tagStatus = pgEnum("tag_status", ["ok", "failed", "safety"]);
 export const msgRole = pgEnum("msg_role", ["user", "assistant"]);
 export const msgKind = pgEnum("msg_kind", ["answer", "clarify", "safety"]);
-export const safetySurface = pgEnum("safety_surface", ["chat", "moment"]);
+export const safetySurface = pgEnum("safety_surface", ["chat", "moment", "community"]);
+export const postKind = pgEnum("post_kind", ["question", "worked", "share"]);
+export const modStatus = pgEnum("mod_status", ["live", "review", "hidden", "removed"]);
+export const workedOutcome = pgEnum("worked_outcome", ["helped", "somewhat", "didnt"]);
+export const reactionKind = pgEnum("reaction_kind", ["same", "helpful"]);
+export const targetType = pgEnum("target_type", ["post", "reply"]);
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const userRef = () =>
@@ -252,6 +257,111 @@ export const notifications = pgTable(
   },
   // One tip per user per day: makes the scheduled job idempotent.
   (t) => [uniqueIndex("notifications_user_day_idx").on(t.userId, t.forDate)],
+);
+
+/* ---------------- Circles (anonymous community) ---------------- */
+
+export const communityPosts = pgTable(
+  "community_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userRef(),
+    goalSlug: text("goal_slug")
+      .notNull()
+      .references(() => goals.slug, { onDelete: "cascade" }),
+    // Snapshot at posting time: the band and label describe the post, not the parent today.
+    ageBand: text("age_band"),
+    authorLabel: text("author_label").notNull(),
+    kind: postKind("kind").notNull(),
+    body: text("body").notNull(),
+    winId: text("win_id").references(() => wins.id, { onDelete: "set null" }),
+    outcome: workedOutcome("outcome"),
+    status: modStatus("status").notNull(),
+    modReasons: jsonb("mod_reasons").notNull().default(sql`'[]'::jsonb`),
+    safety: jsonb("safety"),
+    /** Set when a moderator approves: reports alone can no longer auto-hide it. */
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("community_posts_feed_idx").on(t.goalSlug, t.status, t.createdAt),
+    index("community_posts_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+export const communityReplies = pgTable(
+  "community_replies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => communityPosts.id, { onDelete: "cascade" }),
+    // Null for the ParentPal guide reply.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    authorLabel: text("author_label"),
+    isGuide: boolean("is_guide").notNull().default(false),
+    body: text("body").notNull(),
+    citations: jsonb("citations").notNull().default(sql`'[]'::jsonb`),
+    status: modStatus("status").notNull(),
+    modReasons: jsonb("mod_reasons").notNull().default(sql`'[]'::jsonb`),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("community_replies_post_idx").on(t.postId, t.createdAt), index("community_replies_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const communityReactions = pgTable(
+  "community_reactions",
+  {
+    userId: userRef(),
+    targetType: targetType("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    kind: reactionKind("kind").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.targetId, t.kind] }), index("community_reactions_target_idx").on(t.targetId)],
+);
+
+export const communityReports = pgTable(
+  "community_reports",
+  {
+    userId: userRef(),
+    targetType: targetType("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.targetId] })],
+);
+
+export const communityBlocks = pgTable(
+  "community_blocks",
+  {
+    userId: userRef(),
+    blockedUserId: uuid("blocked_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.blockedUserId] })],
+);
+
+/** "New replies to your post": at most one row per post per day, merged into the inbox. */
+export const communityNotices = pgTable(
+  "community_notices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userRef(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => communityPosts.id, { onDelete: "cascade" }),
+    forDate: date("for_date").notNull(),
+    count: integer("count").notNull().default(1),
+    guideReplied: boolean("guide_replied").notNull().default(false),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("community_notices_post_day_idx").on(t.userId, t.postId, t.forDate)],
 );
 
 /* ---------------- Observability ---------------- */

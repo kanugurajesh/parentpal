@@ -6,6 +6,7 @@ import { db, schema } from "../db/client";
 import { requireUser } from "../lib/auth";
 import { badRequest, notFound } from "../lib/errors";
 import { iso } from "../lib/serialize";
+import { markNoticeRead, noticesFor } from "../services/community";
 import { addDays, todayISO, upcomingTips } from "../services/dailyTips";
 
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
@@ -51,7 +52,11 @@ export const notificationRoutes: FastifyPluginAsyncZod = async (app) => {
         .where(and(eq(schema.notifications.userId, req.userId), today ? lte(schema.notifications.forDate, today) : undefined))
         .orderBy(desc(schema.notifications.forDate))
         .limit(30);
-      return { notifications: rows.map(toNotification), unread: rows.filter((r) => !r.readAt).length };
+      // Circles reply notices share the inbox with daily ideas.
+      const merged = [...rows.map(toNotification), ...(await noticesFor(req.userId, today))]
+        .sort((a, b) => b.forDate.localeCompare(a.forDate) || b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 30);
+      return { notifications: merged, unread: merged.filter((n) => !n.readAt).length };
     },
   );
 
@@ -85,8 +90,10 @@ export const notificationRoutes: FastifyPluginAsyncZod = async (app) => {
         .set({ readAt: new Date() })
         .where(and(eq(schema.notifications.id, req.params.id), eq(schema.notifications.userId, req.userId)))
         .returning();
-      if (!n) throw notFound("Notification");
-      return toNotification(n);
+      if (n) return toNotification(n);
+      if (!(await markNoticeRead(req.userId, req.params.id))) throw notFound("Notification");
+      const notices = await noticesFor(req.userId);
+      return notices.find((x) => x.id === req.params.id)!;
     },
   );
 };

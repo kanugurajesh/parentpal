@@ -144,6 +144,8 @@ export const Win = z.object({
   script: z.string().nullable(),
   whatToExpect: z.string().nullable(),
   sources: z.array(Source),
+  /** "What worked" reports from Circles. Null until enough parents have reported (no small-sample stats). */
+  community: z.object({ tried: z.number().int(), helped: z.number().int() }).nullable().optional(),
 });
 export type Win = z.infer<typeof Win>;
 
@@ -287,8 +289,154 @@ export const Notification = z.object({
   forDate: z.string(),
   readAt: z.string().nullable(),
   createdAt: z.string(),
+  /** Set on "new replies to your post" notices from Circles; tapping opens the post. */
+  postId: z.string().uuid().nullable().optional(),
 });
 export type Notification = z.infer<typeof Notification>;
+
+/* ------------------------------------------------------------------ */
+/* Circles: anonymous parent community                                 */
+/* ------------------------------------------------------------------ */
+
+export const AGE_BANDS = ["0-1y", "1-2y", "2-3y", "3-5y", "5y+"] as const;
+export const AgeBand = z.enum(AGE_BANDS);
+export type AgeBand = z.infer<typeof AgeBand>;
+
+export const AGE_BAND_LABELS: Record<AgeBand, string> = {
+  "0-1y": "Under 1",
+  "1-2y": "1 to 2",
+  "2-3y": "2 to 3",
+  "3-5y": "3 to 5",
+  "5y+": "5 and up",
+};
+
+export const PostKind = z.enum(["question", "worked", "share"]);
+export type PostKind = z.infer<typeof PostKind>;
+export const WorkedOutcome = z.enum(["helped", "somewhat", "didnt"]);
+export type WorkedOutcome = z.infer<typeof WorkedOutcome>;
+export const ModStatus = z.enum(["live", "review", "hidden", "removed"]);
+export type ModStatus = z.infer<typeof ModStatus>;
+export const ReactionKind = z.enum(["same", "helpful"]);
+export type ReactionKind = z.infer<typeof ReactionKind>;
+export const TargetType = z.enum(["post", "reply"]);
+export type TargetType = z.infer<typeof TargetType>;
+
+export const POST_MIN = 20;
+export const POST_MAX = 600;
+export const REPLY_MAX = 600;
+/** "Parents like you" stats on a win only appear once this many parents have reported. */
+export const MIN_WIN_REPORTS = 3;
+
+export const CommunityAuthor = z.object({
+  /** Stable per circle, unlinkable across circles. Never a real name. */
+  pseudonym: z.string(),
+  /** e.g. "Mom of a 2 to 3 year old". */
+  label: z.string(),
+  isMe: z.boolean(),
+});
+export type CommunityAuthor = z.infer<typeof CommunityAuthor>;
+
+const Reactions = z.object({ same: z.number().int(), helpful: z.number().int() });
+
+export const CommunityPost = z.object({
+  id: z.string().uuid(),
+  goalSlug: GoalSlug,
+  kind: PostKind,
+  body: z.string(),
+  ageBand: AgeBand.nullable(),
+  win: z.object({ id: z.string(), title: z.string() }).nullable(),
+  outcome: WorkedOutcome.nullable(),
+  status: ModStatus,
+  author: CommunityAuthor,
+  reactions: Reactions,
+  myReactions: z.array(ReactionKind),
+  replyCount: z.number().int(),
+  /** Pinned support notice, e.g. for a developmental concern. */
+  safety: SafetyNotice.nullable(),
+  createdAt: z.string(),
+});
+export type CommunityPost = z.infer<typeof CommunityPost>;
+
+export const CommunityReply = z.object({
+  id: z.string().uuid(),
+  postId: z.string().uuid(),
+  body: z.string(),
+  /** The ParentPal guide reply: grounded in the content library, with citations. */
+  isGuide: z.boolean(),
+  citations: z.array(Citation),
+  status: ModStatus,
+  author: CommunityAuthor.nullable(),
+  reactions: Reactions,
+  myReactions: z.array(ReactionKind),
+  createdAt: z.string(),
+});
+export type CommunityReply = z.infer<typeof CommunityReply>;
+
+export const Circle = z.object({
+  goalSlug: GoalSlug,
+  title: z.string(),
+  category: GoalCategory,
+  illustration: z.string(),
+  mine: z.boolean(),
+  postsThisWeek: z.number().int(),
+});
+export type Circle = z.infer<typeof Circle>;
+
+export const CirclesResponse = z.object({
+  circles: z.array(Circle),
+  /** The viewer's age band (first child), used as the default feed filter. */
+  myAgeBand: AgeBand.nullable(),
+  canPost: z.boolean(),
+});
+export type CirclesResponse = z.infer<typeof CirclesResponse>;
+
+export const FeedResponse = z.object({
+  posts: z.array(CommunityPost),
+  /** Cold-start fallback: posts from neighbouring age bands when the chosen band is quiet. */
+  nearby: z.array(CommunityPost),
+  nextCursor: z.string().nullable(),
+});
+export type FeedResponse = z.infer<typeof FeedResponse>;
+
+export const PostDetail = z.object({ post: CommunityPost, replies: z.array(CommunityReply) });
+export type PostDetail = z.infer<typeof PostDetail>;
+
+export const CreatePost = z
+  .object({
+    kind: PostKind,
+    body: z.string().trim().min(POST_MIN, `Write at least ${POST_MIN} characters`).max(POST_MAX),
+    winId: z.string().optional(),
+    outcome: WorkedOutcome.optional(),
+  })
+  .refine((p) => p.kind !== "worked" || (p.winId && p.outcome), { message: "Pick the win you tried and how it went", path: ["winId"] });
+export type CreatePost = z.infer<typeof CreatePost>;
+
+export const CreateReply = z.object({ body: z.string().trim().min(2).max(REPLY_MAX) });
+export type CreateReply = z.infer<typeof CreateReply>;
+
+/** live: visible now. review: only the author sees it until a moderator approves. safety: not posted, support shown. */
+export const CreateOutcome = z.enum(["live", "review", "safety"]);
+export type CreateOutcome = z.infer<typeof CreateOutcome>;
+
+export const CreatePostResponse = z.object({
+  outcome: CreateOutcome,
+  post: CommunityPost.nullable(),
+  safety: SafetyNotice.nullable(),
+});
+export type CreatePostResponse = z.infer<typeof CreatePostResponse>;
+
+export const CreateReplyResponse = z.object({
+  outcome: CreateOutcome,
+  reply: CommunityReply.nullable(),
+  safety: SafetyNotice.nullable(),
+});
+export type CreateReplyResponse = z.infer<typeof CreateReplyResponse>;
+
+export const ReactInput = z.object({ targetType: TargetType, targetId: z.string().uuid(), kind: ReactionKind });
+export const ReportReason = z.enum(["unkind", "medical_advice", "personal_info", "spam", "other"]);
+export type ReportReason = z.infer<typeof ReportReason>;
+export const ReportInput = z.object({ targetType: TargetType, targetId: z.string().uuid(), reason: ReportReason });
+export const BlockInput = z.object({ targetType: TargetType, targetId: z.string().uuid() });
 
 export const CostSummary = z.object({
   totalCalls: z.number(),
@@ -320,4 +468,12 @@ export function formatAge(months: number): string {
   const y = Math.floor(months / 12);
   const m = months % 12;
   return m ? `${y} yr ${m} mo` : `${y} years`;
+}
+
+export function ageBandOf(months: number): AgeBand {
+  if (months < 12) return "0-1y";
+  if (months < 24) return "1-2y";
+  if (months < 36) return "2-3y";
+  if (months < 60) return "3-5y";
+  return "5y+";
 }

@@ -72,7 +72,7 @@ function parseBlocks(text: string): Block[] {
   return blocks.filter((b) => b.kind !== "para" || b.text);
 }
 
-function AnswerText({ text }: { text: string }) {
+export function AnswerText({ text }: { text: string }) {
   const blocks = parseBlocks(text);
   return (
     <View style={{ gap: space.sm }}>
@@ -111,7 +111,7 @@ function Caret() {
   return <Animated.View style={[{ width: 8, height: 18, borderRadius: 2, backgroundColor: color.moss, marginTop: 4 }, style]} />;
 }
 
-function Sources({ citations }: { citations: Citation[] }) {
+export function Sources({ citations }: { citations: Citation[] }) {
   if (!citations.length) return null;
   return (
     <View style={{ gap: space.xs }}>
@@ -170,6 +170,7 @@ export function AssistantBubble({
   onBookmark,
   onPickOption,
   optionsDisabled,
+  onAskParents,
 }: {
   message: ChatMessage;
   streaming?: boolean;
@@ -177,6 +178,8 @@ export function AssistantBubble({
   onBookmark?: (on: boolean) => void;
   onPickOption?: (o: string) => void;
   optionsDisabled?: boolean;
+  /** Offers to take the question to a Circle when the guide answer isn't enough. */
+  onAskParents?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const plain = toPlain(message.content);
@@ -226,6 +229,32 @@ export function AssistantBubble({
             onPress={() => onBookmark?.(!message.bookmarked)}
           />
         </View>
+      ) : null}
+      {!streaming && message.kind === "answer" && onAskParents ? (
+        <Pressable
+          onPress={onAskParents}
+          accessibilityRole="button"
+          accessibilityHint="Opens a new anonymous post in Circles with your question"
+          style={({ pressed, focused }: PState) => [
+            {
+              flexDirection: "row",
+              alignItems: "center",
+              gap: space.sm,
+              alignSelf: "flex-start",
+              marginLeft: space.sm,
+              paddingVertical: space.xs,
+              paddingHorizontal: space.md,
+              borderRadius: radius.pill,
+              backgroundColor: pressed || message.rating === -1 ? color.mossTint : "transparent",
+            },
+            focused && ui.focusRing,
+          ]}
+        >
+          <Icon name="people" size={18} color={color.moss} />
+          <T variant="smallStrong" color={color.moss}>
+            {message.rating === -1 ? "Not quite right? Ask other parents" : "Ask other parents"}
+          </T>
+        </Pressable>
       ) : null}
     </View>
   );

@@ -22,7 +22,10 @@ export type IconName =
   | "send"
   | "check"
   | "spark"
-  | "trash";
+  | "trash"
+  | "people"
+  | "more"
+  | "heart";
 
 /** Hand-drawn, 24px grid, 1.8 stroke, rounded caps: one consistent icon voice for the app. */
 export function Icon({ name, size = 24, color = c.ink, filled = false }: { name: IconName; size?: number; color?: string; filled?: boolean }) {
@@ -125,6 +128,27 @@ export function Icon({ name, size = 24, color = c.ink, filled = false }: { name:
           <Path {...s} d="M10.3 11v5.5M13.7 11v5.5" />
         </>
       );
+      break;
+    case "people":
+      body = (
+        <>
+          <Circle {...s} fill={fillCol} cx={9} cy={8.5} r={3.3} />
+          <Path {...s} d="M3.5 19.5c.7-3.2 2.9-5 5.5-5s4.8 1.8 5.5 5" />
+          <Path {...s} d="M15.2 5.6a3.2 3.2 0 0 1 0 6M17.2 14.7c1.8.6 3 2.2 3.4 4.8" />
+        </>
+      );
+      break;
+    case "more":
+      body = (
+        <>
+          <Circle cx={6} cy={12} r={1.6} fill={color} />
+          <Circle cx={12} cy={12} r={1.6} fill={color} />
+          <Circle cx={18} cy={12} r={1.6} fill={color} />
+        </>
+      );
+      break;
+    case "heart":
+      body = <Path {...s} fill={fillCol} d="M12 19.5s-7.5-4.4-7.5-9.6A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.5 2.3c0 5.2-7.5 9.6-7.5 9.6z" />;
       break;
   }
   return (

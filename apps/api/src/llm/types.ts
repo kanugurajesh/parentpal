@@ -36,6 +36,6 @@ export interface LLMProvider {
 }
 
 export interface CallContext {
-  purpose: "chat_answer" | "chat_clarify" | "moment_tag" | "pattern" | "daily_tip" | "eval_judge";
+  purpose: "chat_answer" | "chat_clarify" | "moment_tag" | "pattern" | "daily_tip" | "eval_judge" | "community_moderation" | "community_guide";
   userId?: string | null;
 }

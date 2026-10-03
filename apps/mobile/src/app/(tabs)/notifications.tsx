@@ -122,7 +122,8 @@ export default function Notifications() {
               accessibilityLabel={`${unread ? "Unread. " : ""}${n.title}. ${n.body}`}
               onPress={() => {
                 if (unread) read.mutate(n.id);
-                if (n.goalSlug) router.push({ pathname: "/goal/[slug]", params: { slug: n.goalSlug } });
+                if (n.postId) router.push({ pathname: "/post/[id]", params: { id: n.postId } });
+                else if (n.goalSlug) router.push({ pathname: "/goal/[slug]", params: { slug: n.goalSlug } });
               }}
               style={({ pressed, focused }: PState) => [
                 {

@@ -223,6 +223,43 @@ export function stripInvalidMarkers(text: string, n: number) {
   return text.replace(/\s?\[(\d+)\]/g, (whole, d) => (Number(d) >= 1 && Number(d) <= n ? whole : ""));
 }
 
+const PUBLIC_REPLY_NOTE = `
+- You are replying publicly in an anonymous parent group, not to a known family. Address the parent as "you", use no names, and ignore the rule about nicknames and logged moments.`;
+
+/**
+ * One non-streamed, grounded answer for a public setting (the Circles guide reply). Uses the same
+ * prompt, retrieval threshold and citation checks as chat, but no family context. Returns null
+ * rather than answer without grounding: no usable excerpts, no valid citation, or a red flag.
+ */
+export async function answerOnce(
+  userId: string | null,
+  question: string,
+  opts: { goalSlug: string; ageLabel: string | null },
+): Promise<{ text: string; citations: Citation[] } | null> {
+  if (checkSafety(question)) return null;
+  // An unprompted public answer needs a stronger match than chat: confident, and from this circle's own goal.
+  const chunks = await retrieve(question, { boostGoals: [opts.goalSlug], limit: 3 });
+  if ((chunks[0]?.score ?? 0) < CONFIDENT_SCORE) return null;
+  const usable = chunks.filter((c) => c.goalSlug === opts.goalSlug && c.score >= MIN_CITABLE_SCORE);
+  if (!usable.length) return null;
+
+  const anonymous: FamilyContext = { parentName: null, children: [], goals: [], recentMoments: [] };
+  const userPrompt = `Child's age: ${opts.ageLabel ?? "not given"}\n\nGuide excerpts:\n${excerpts(usable)}\n\nParent's question: ${question}`;
+  let text: string;
+  try {
+    text = await llm.complete(
+      { purpose: "community_guide", userId },
+      { system: ANSWER_SYSTEM + PUBLIC_REPLY_NOTE, messages: [{ role: "user", content: userPrompt }], maxTokens: 450, mock: () => mockAnswer(anonymous, usable) },
+    );
+  } catch {
+    return null;
+  }
+  const clean = stripInvalidMarkers(text, usable.length).trim();
+  const citations = extractCitations(clean, usable);
+  if (!clean || !citations.length || checkSafety(clean)) return null;
+  return { text: clean, citations };
+}
+
 export async function* runChat(
   userId: string,
   input: { text: string; clarifies?: string },

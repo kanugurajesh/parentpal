@@ -11,7 +11,10 @@ import { Pebble } from "@/components/Pebble";
 import { Button, ErrorNote, Loading, Screen, T, styles as ui } from "@/components/ui";
 import { api } from "@/lib/api";
 import { usePrimaryChild } from "@/lib/session";
-import { color, radius, space } from "@/theme/tokens";
+import { categoryColor, color, radius, space } from "@/theme/tokens";
+
+/** One pebble per moment needed for the first pattern, coloured like the welcome cairn. */
+const SLOT_FILLS = [categoryColor.habits.tint, categoryColor.sleep.tint, color.apricot].slice(0, MOMENTS_PER_PATTERN);
 
 function PatternExplainer() {
   const [open, setOpen] = useState(false);
@@ -73,15 +76,11 @@ export default function Story() {
           <View style={{ backgroundColor: color.card, borderRadius: radius.hero, padding: space.xl, gap: space.lg, borderWidth: 1.5, borderColor: color.line }}>
             {/* Progress to the first pattern: three pebble slots */}
             <View style={{ flexDirection: "row", gap: space.sm, alignItems: "flex-end" }} accessibilityLabel={`${Math.min(count, 3)} of ${MOMENTS_PER_PATTERN} moments logged`}>
-              {Array.from({ length: MOMENTS_PER_PATTERN }, (_, i) => (
-                <Pebble
-                  key={i}
-                  width={64 - i * 6}
-                  shape={i + 1}
-                  fill={i < count ? color.apricot : color.paperDeep}
-                  stroke={i < count ? color.ink : color.line}
-                  strokeWidth={i < count ? 3 : 2.5}
-                />
+              {SLOT_FILLS.map((fill, i) => (
+                // Same palette as the welcome cairn; slots not logged yet stay soft so progress still reads.
+                <View key={i} style={{ opacity: i < count ? 1 : 0.6 }}>
+                  <Pebble width={64 - i * 6} shape={i + 1} fill={fill} stroke={color.ink} strokeWidth={i < count ? 3 : 2.5} />
+                </View>
               ))}
             </View>
             <T variant="h2">Log at least 3 moments to understand {name} deeper</T>

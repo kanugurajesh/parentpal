@@ -13,6 +13,7 @@ import { llm } from "./llm";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { chatRoutes } from "./routes/chat";
+import { communityRoutes } from "./routes/community";
 import { goalRoutes } from "./routes/goals";
 import { meRoutes } from "./routes/me";
 import { notificationRoutes } from "./routes/notifications";
@@ -52,6 +53,7 @@ export async function buildApp() {
       await v1.register(storyRoutes);
       await v1.register(chatRoutes);
       await v1.register(notificationRoutes);
+      await v1.register(communityRoutes);
       await v1.register(adminRoutes);
     },
     { prefix: "/v1" },

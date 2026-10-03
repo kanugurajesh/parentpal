@@ -17,8 +17,95 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Story** | Log moments in free text. An LLM tags each one as trigger / behavior / outcome. After every 3 moments it writes a pattern insight that links back to the moments it came from. |
 | **Ask** | Streaming chat (SSE). Answers draw on the child's age, active goals and recent moments, plus retrieved content shown as citations. Vague questions get one clarifying question with tap-to-answer options. Replies can be rated 👍/👎, copied, shared and bookmarked. |
 | **Notifications** | On-device reminders that serve the try → log → pattern loop: a daily idea sent when it's usable (sleep ideas before bedtime), a "How did it go?" check-in the morning after tapping **I'll try this** on a win (opens the moment log, filled in), and one nudge after 3 days without a moment. At most one a day, never at night, each type switchable in Settings. Tips also collect in an in-app inbox. See [How notifications work](#how-notifications-work). |
+| **Circles** | Anonymous groups by goal, with posts tagged by the child's age band. Each parent gets a different nickname in each circle. Three post types: question, **what worked** (tied to a win, with an outcome) and sharing. Questions get a cited "ParentPal guide" reply straight away. "What worked" reports add up to a "Parents like you: 5 of 7 said it helped" line on the win. Every post and reply is moderated before anyone sees it. See [How Circles work](#how-circles-work). |
 | **Profile** | Family profile, sign in / create account (upgrades the guest account), bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
 | **Safety** | A rule-based red-flag check runs on every chat message and moment *before* any LLM call. Covered: medical emergencies, abuse, self-harm, developmental concerns. On a match the app skips the advice and shows fixed safety guidance instead. |
+
+## Feature brief: Circles
+
+> **In one line:** anonymous groups of parents working on the same goal with children the same age, where every question gets an expert-grounded answer straight away and every "what worked" report makes the core plan more credible.
+
+### The problem
+
+ParentPal gives expert-backed plans (goals → wins) and an AI that answers questions. Two needs are still unmet:
+
+1. **"Is it just me?"** Much of what parents of young children feel is isolation and self-doubt. An AI can give the right advice but can't tell you that other parents are going through the same thing.
+2. **"Will this actually work for my kid?"** A win from a guide is credible. A win that 5 of 7 parents with 2-year-olds say helped is persuasive.
+
+Today parents take both needs to WhatsApp groups and Instagram comments. Those are noisy, not anonymous, not organised by age or problem, and full of unchecked medical advice. ParentPal can offer the safer version.
+
+### Why not just add a forum?
+
+Parent forums fail in four predictable ways. Each became a design constraint:
+
+| Risk | What would happen | How Circles handle it |
+|---|---|---|
+| **Cold start** | Few users split across many rooms means empty feeds, so people leave | One circle per goal (not goal × age). Quiet age bands borrow from **nearby ages**. Every question gets an **instant guide answer**, so nothing goes unanswered. |
+| **Bad advice** | "Give 3mg melatonin", "sounds like ADHD" | AI and rule moderation before anything is published. Medicine doses and diagnoses go to review; insults and spam are rejected. |
+| **Crises posted in public** | A parent in distress gets silence or judgement | The same safety rules as chat. Crisis posts are **never published**; the parent sees helplines immediately. |
+| **Privacy** | Children's names, photos and phone numbers in public | Text only. Numbers, emails and links are rejected. Children's names become "my child". A different nickname in every circle. |
+
+The guiding principle: **the community adds warmth and real-world evidence; the AI and the expert content keep it safe and useful.**
+
+### How a parent uses it
+
+1. **Open the Circles tab.** Your circles (from the goals you picked) come first, e.g. *Handling tantrums*, with how active each one is this week.
+2. **Browse your child's age.** The feed opens on your child's age band ("2 to 3"). You can switch to any age or "All ages".
+3. **Ask a question.** For example, *"My child screams every time we leave the park. How do you handle it?"* You post as "Gentle Robin · Mom of a 2-year-old", never your name. Within seconds a **ParentPal guide** reply appears, built from the expert content and citing the win it came from. Other parents reply below it.
+4. **React.** "Same here" (solidarity) and "Helpful" (useful). No downvotes, no follower counts, no profiles.
+5. **Share what worked.** After trying a win, tap **Share how it went** on the win card. Pick "It helped", "Helped a bit" or "Didn't help" and add a tip. Once 3 parents have reported, the win shows **"Parents like you: 5 of 7 said it helped"**.
+6. **Get pulled back in.** Replies to your post show up in the Notifications inbox, at most one notice per post per day.
+7. **Stay in control.** Delete your own posts. Report or block anyone. Blocking hides a parent everywhere, and they're never told.
+
+Other entry points: **"Ask other parents"** under any chat answer (it prefills your question, especially useful after a 👎), and **"Share how it went"** on every win.
+
+### What makes it different
+
+- **AI is the first responder, not the only one.** Every question is answered within seconds from vetted content, with sources. Parents add experience on top. If the content doesn't cover the question, the guide stays silent instead of guessing.
+- **The community feeds the product.** "What worked" reports turn into social proof on the wins, which supports the core loop: try a win, see results, stick with the plan, convert to paid.
+- **Safety is built in from the start.** Moderation runs before publishing, fails closed (if the AI is down, posts wait for review) and is covered by automated tests.
+- **Anonymous by design.** Parents share the embarrassing stuff (yelling, "I felt like a bad mom") because nobody knows who they are.
+
+### Safety and moderation at a glance
+
+| What a parent writes | What happens |
+|---|---|
+| Support, venting, self-criticism, a parent's own child's diagnosis, "see your pediatrician" | Published immediately |
+| A medicine or dose, a diagnosis of someone else's child, off-topic content | Held for review; only the author sees it |
+| Insults, shaming, selling or "DM me" | Rejected, with a kind explanation |
+| Phone number, email, link, @handle | Rejected: "Circles are anonymous, please remove…" |
+| Emergency, self-harm, abuse | Not published; helplines shown immediately |
+| A developmental worry ("not talking yet at 2") | Published, with a "talk to your pediatrician" card pinned and no AI answer |
+| Reported by 3 different parents | Hidden until a moderator decides |
+
+Checked against the live model (Groq `gpt-oss-120b`) with 10 hand-written replies covering each row above: all 10 were handled as intended.
+
+### Metrics to watch
+
+Proposed, not yet instrumented:
+
+- **Activation:** % of weekly active parents who open Circles, and % who post or reply.
+- **Answer speed:** % of questions with a guide reply (target: most on-topic questions), and time to first parent reply.
+- **Product link:** number of "what worked" reports per win, and whether parents who see "Parents like you" stats try more wins or convert to paid more often.
+- **Health:** % of posts held for review, reports per 100 posts, and how long items wait in the review queue.
+- **Retention:** D7/D30 retention of parents who posted vs. those who didn't.
+
+### Rollout suggestion
+
+1. **Seed honestly.** Before launch, the team posts real questions it has heard from parents, labelled as from the ParentPal team, never fake parents.
+2. **Start with the 2–3 most-picked goals**, and widen once feeds are active.
+3. **Daily moderation owner.** Someone checks the review queue every day. It's an API endpoint today; a simple admin screen is the first follow-up.
+4. **Watch the review rate.** If too many good posts get held, tune the moderation prompt with real examples.
+
+### Effort and status
+
+Built end to end: API, database migration, moderation, mobile screens, and 18 automated tests covering anonymity, moderation, crisis handling, reports, blocks, rate limits, the guide reply and win stats. Engineering details are in [How Circles work](#how-circles-work).
+
+**Next steps, in priority order:**
+1. Admin screen for the review queue.
+2. Push notifications for replies.
+3. A weekly AI digest per circle ("This week, parents of 2-year-olds found…").
+4. Semantic search (pgvector) so the guide answers more questions.
 
 ## Architecture
 
@@ -155,6 +242,25 @@ If the API can't be reached during a sync, the previous schedule is kept. Syncs 
 
 **Trying it out.** Run the app on an iPhone with Expo Go, or on Android with a development build (`npx expo run:android`, or an EAS development build). Turn notifications on from the Notifications tab, then open a goal and tap **I'll try this**. The check-in arrives the next morning at 8:30. Today's idea is already in the inbox.
 
+### How Circles work
+
+**Why a constrained version.** Parents want to hear "it's not just you" from other parents, which the AI can't really provide. But open parent forums fail in predictable ways: empty rooms early on, medical misinformation, crises posted in public, and children's names and photos. Circles are designed around those four problems.
+
+| Problem | What Circles do |
+|---|---|
+| Empty rooms | One circle per goal (not goal × age). Posts carry an age band, and a quiet band shows posts from **nearby ages**. Every question gets an instant **guide reply** built with the chat pipeline: same prompt, a stricter score threshold, only chunks from the circle's own goal, and dropped entirely if it can't cite. |
+| Misinformation | `services/moderation.ts` runs on every post and reply. Dose and medicine mentions (rules) and diagnoses of someone else's child (LLM) go to **review**: only the author sees them until a moderator approves. Insults, shaming and spam are rejected with a reason. If the LLM is down, items wait for review (**fail-closed**). |
+| Crises | The same red-flag rules as chat. Emergencies, self-harm and abuse are **never published**; the author sees the safety card instead. A developmental worry is published with the "talk to your pediatrician" card pinned and no guide reply. |
+| Identity | Phone numbers, emails, links and @handles are rejected. The author's own children's nicknames are replaced with "my child". Pseudonyms come from `hash(secret, circle, user)`, so the same parent can't be linked across circles. Only signed-up accounts can post, react or report, which limits spam. Guests can read. |
+
+Three reports from different parents hide an item until a moderator decides; once a moderator approves it, reports alone can't hide it again. Blocking hides a parent's content everywhere, for the blocker only. Limits: 5 posts and 30 replies a day. Reply notices (at most one per post per day) appear in the Notifications inbox.
+
+| File | Role |
+|---|---|
+| `apps/api/src/services/community.ts` | Feed, posts, replies, reactions, reports, blocks, guide reply, win stats, inbox notices |
+| `apps/api/src/services/moderation.ts` | PII rules, nickname scrub, safety gate, medication rule, LLM verdict |
+| `apps/mobile/src/app/(tabs)/circles.tsx`, `circle/[goal].tsx`, `post/[id].tsx`, `post/new.tsx` | Circles tab, feed, post and composer |
+
 ### LLM providers
 
 `apps/api/src/llm/` exposes `complete()`, `stream()` and `json<T>(schema)` with three adapters behind one `LLMProvider` interface:
@@ -240,7 +346,8 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Story:** `GET|POST /moments`, `DELETE /moments/:id`, `GET /patterns`, `POST /patterns/generate`
 - **Chat:** `GET /chat`, `DELETE /chat` (starts a fresh conversation; bookmarked replies are kept), `GET /chat/starters`, `GET /chat/topics`, `POST /chat/messages` (SSE: `meta` → `delta`* → `done`), feedback and bookmark routes, `GET /bookmarks`
 - **Notifications:** `GET /notifications?today=YYYY-MM-DD` (inbox; hides tips dated after the device's today), `GET /notifications/upcoming?from=YYYY-MM-DD&days=1-3` (creates and returns the next days' tips for on-device scheduling; `from` must be within a day of the server's date), `POST /notifications/:id/read`
-- **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`
+- **Circles:** `GET /circles`, `GET|POST /circles/:goal/posts` (`?band=2-3y|all&cursor=`), `GET|DELETE /posts/:id`, `POST /posts/:id/replies`, `DELETE /replies/:id`, `POST /reactions` (toggles), `POST /reports`, `POST /blocks`. Writes need a signed-up account.
+- **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`, `GET /admin/community/queue`, `POST /admin/community/:type/:id` (`approve` or `remove`)
 
 `GET /health` (no auth) reports which LLM provider is active.
 
@@ -269,6 +376,7 @@ Seven goals exist. Three have full content: **handling tantrums**, **fixing slee
 - Only the child's birth **month and year** are stored, never the full date.
 - `llm_calls` stores metrics only, never prompts or outputs. `safety_events` stores the category only.
 - Notifications are scheduled on the phone, so their text (which includes the child's nickname) never passes through a push service. Notification settings and pending check-ins are stored only on the device.
+- Circles show a per-circle pseudonym and a coarse label ("Mom of a 2-year-old"), never a name, email or child's nickname. The API never returns another user's id.
 - Every user-owned table cascades from `users`, so deleting an account removes all of that user's data. A test checks this.
 
 ## Known limitations
@@ -279,6 +387,7 @@ Seven goals exist. Three have full content: **handling tantrums**, **fixing slee
 - **Payments and referrals are stubs.** The paywall writes a fake subscription row, which does unlock content.
 - **Notifications are on-device only, and not available in Android Expo Go.** Testing them on Android needs a development build. They pause if the app isn't opened for about 3 days, and there's no measurement yet of how often a check-in leads to a logged moment.
 - **Single instance.** The daily tip cron runs in-process.
+- **Circles moderation has no admin UI yet.** The review queue is a JSON endpoint. Before launch, someone has to own that queue every day. There are no push alerts for replies, only the inbox.
 - One running conversation per user. No password reset or social sign-in.
 
 ## More docs

@@ -97,12 +97,28 @@ function WinCard({ win, accent, goalSlug }: { win: Win; accent: string; goalSlug
         </T>
         <T color={color.inkSoft}>{win.whatToExpect}</T>
       </View>
+      {win.community ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, backgroundColor: color.mossTint, borderRadius: radius.inner, padding: space.md }}>
+          <Icon name="people" size={20} color={color.moss} />
+          <T variant="small" style={{ flex: 1 }}>
+            <T variant="smallStrong">Parents like you: </T>
+            {win.community.helped} of {win.community.tried} who tried this said it helped.
+          </T>
+        </View>
+      ) : null}
       {win.sources.length ? (
         <T variant="tiny" color={color.inkMuted}>
           Based on {win.sources.map((s) => s.publisher.split(" (")[0]).filter((v, i, a) => a.indexOf(v) === i).join(" and ")}
         </T>
       ) : null}
       <TryThis win={win} goalSlug={goalSlug} />
+      <Button
+        label="Share how it went"
+        kind="ghost"
+        icon="people"
+        accessibilityHint="Tell other parents in Circles whether this worked for you"
+        onPress={() => router.push({ pathname: "/post/new", params: { goal: goalSlug, kind: "worked", winId: win.id } })}
+      />
     </View>
   );
 }

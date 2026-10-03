@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { CostSummary } from "@parentpal/shared";
+import { CostSummary, TargetType } from "@parentpal/shared";
 import { db } from "../db/client";
 import { requireAdmin } from "../lib/auth";
+import { moderateItem, moderationQueue } from "../services/community";
 import { runDailyTips } from "../services/dailyTips";
 
 export async function costSummary(days = 30): Promise<CostSummary> {
@@ -60,4 +61,13 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   app.post("/dev/run-daily-tips", async () => runDailyTips());
+
+  /** Circles moderation: items awaiting review or hidden by reports. */
+  app.get("/admin/community/queue", async () => moderationQueue());
+
+  app.post(
+    "/admin/community/:type/:id",
+    { schema: { params: z.object({ type: TargetType, id: z.string().uuid() }), body: z.object({ action: z.enum(["approve", "remove"]) }) } },
+    async (req) => moderateItem(req.params.type, req.params.id, req.body.action),
+  );
 };

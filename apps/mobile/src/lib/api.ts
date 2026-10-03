@@ -3,6 +3,17 @@ import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 import { localDateISO } from "./dates";
 import type {
+  AgeBand,
+  CirclesResponse,
+  CommunityReply,
+  CreatePost,
+  CreatePostResponse,
+  CreateReplyResponse,
+  FeedResponse,
+  PostDetail,
+  ReactionKind,
+  ReportReason,
+  TargetType,
   Advisor,
   AuthResponse,
   ChatMessage,
@@ -110,6 +121,20 @@ export const api = {
   notifications: () => request<{ notifications: Notification[]; unread: number }>("GET", `/notifications?today=${localDateISO()}`),
   upcomingTips: () => request<{ notifications: Notification[] }>("GET", `/notifications/upcoming?from=${localDateISO()}&days=3`),
   readNotification: (id: string) => request<Notification>("POST", `/notifications/${id}/read`),
+
+  circles: () => request<CirclesResponse>("GET", "/circles"),
+  feed: (goal: GoalSlug, band: AgeBand | "all", cursor?: string) =>
+    request<FeedResponse>("GET", `/circles/${goal}/posts?band=${encodeURIComponent(band)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
+  createPost: (goal: GoalSlug, body: CreatePost) => request<CreatePostResponse>("POST", `/circles/${goal}/posts`, body),
+  post: (id: string) => request<PostDetail>("GET", `/posts/${id}`),
+  deletePost: (id: string) => request<{ deleted: true }>("DELETE", `/posts/${id}`),
+  reply: (postId: string, body: string) => request<CreateReplyResponse>("POST", `/posts/${postId}/replies`, { body }),
+  deleteReply: (id: string) => request<{ deleted: true }>("DELETE", `/replies/${id}`),
+  react: (targetType: TargetType, targetId: string, kind: ReactionKind) =>
+    request<{ reactions: CommunityReply["reactions"]; myReactions: ReactionKind[] }>("POST", "/reactions", { targetType, targetId, kind }),
+  report: (targetType: TargetType, targetId: string, reason: ReportReason) =>
+    request<{ reported: true; hidden: boolean }>("POST", "/reports", { targetType, targetId, reason }),
+  block: (targetType: TargetType, targetId: string) => request<{ blocked: true }>("POST", "/blocks", { targetType, targetId }),
 };
 
 /**
