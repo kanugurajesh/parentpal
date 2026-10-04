@@ -20,6 +20,9 @@ export interface CheckIn {
   goalSlug: string;
   /** The server-side try this check-in asks about. Missing on check-ins saved before tracking existed. */
   tryId?: string;
+  /** Who the win was tried with. Missing on check-ins saved before children could be switched. */
+  childId?: string;
+  childName?: string;
   /** Local date the check-in fires. */
   dueDate: string;
 }
@@ -53,6 +56,7 @@ export function planNotifications(input: {
   now: Date;
   checkIns: CheckIn[];
   tips: Notification[];
+  /** The family's child or children ("Mo" or "Mo or Ada"), for the reminder to log a moment. */
   child?: string;
   /** Local date of the last logged moment (or sign-up); null skips the log reminder. */
   lastActivity: string | null;
@@ -68,10 +72,11 @@ export function planNotifications(input: {
 
     const checkIn = prefs.checkIns ? input.checkIns.find((c) => c.dueDate === day) : undefined;
     if (checkIn) {
+      const who = checkIn.childName ?? child;
       candidates.push({
         at: atLocalTime(day, CHECK_IN_TIME),
         title: `How did "${checkIn.winTitle}" go?`,
-        body: `Tap to note what happened${child ? ` with ${child}` : ""}. One line is enough, and it helps spot patterns.`,
+        body: `Tap to note what happened${who ? ` with ${who}` : ""}. One line is enough, and it helps spot patterns.`,
         data: { kind: "checkin", winTitle: checkIn.winTitle, goalSlug: checkIn.goalSlug, tryId: checkIn.tryId },
       });
     }

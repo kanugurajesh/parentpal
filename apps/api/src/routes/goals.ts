@@ -19,6 +19,7 @@ import { winCommunityStats } from "../services/community";
 import { isSubscribed } from "../services/entitlement";
 import { adviceFor, isStuck, winProgress } from "../services/progress";
 import { loadMe } from "./me";
+import { pickChild } from "../lib/children";
 
 async function sourceMap(ids: string[]) {
   if (!ids.length) return new Map<string, Source>();
@@ -94,7 +95,7 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     "/goals/:slug",
-    { schema: { params: z.object({ slug: GoalSlug }), response: { 200: GoalDetail } } },
+    { schema: { params: z.object({ slug: GoalSlug }), querystring: z.object({ childId: z.string().uuid().optional() }), response: { 200: GoalDetail } } },
     async (req) => {
       const [g] = await db.select().from(schema.goals).where(eq(schema.goals.slug, req.params.slug));
       if (!g) throw notFound("Goal");
@@ -103,7 +104,9 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
       const sources = await sourceMap([...new Set([...g.sourceIds, ...wins.flatMap((w) => w.sourceIds)])]);
       const pick = (ids: string[]) => ids.map((id) => sources.get(id)).filter((s): s is Source => !!s);
       const community = await winCommunityStats(wins.map((w) => w.id));
-      const mine = await winProgress(req.userId, wins.map((w) => w.id));
+      // "You tried this 4×" is per child when the app says which one.
+      if (req.query.childId) await pickChild(req.userId, req.query.childId);
+      const mine = await winProgress(req.userId, wins.map((w) => w.id), req.query.childId);
 
       return {
         slug: g.slug as GoalSlug,

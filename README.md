@@ -20,12 +20,13 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Progress** | Every **I'll try this** is saved as a try. The parent taps how it went (Helped / A bit / Not yet) on the goal screen, or from the next-morning check-in. Each win shows "You tried this 4× · helped 3" and a next step ("This is working, keep going" or "Not helping yet. Try win 2?"). Goals show recent outcomes as dots and, after a week, week 1 against this week. Caregivers' "It worked / It was tough" counts too. See [Progress tracker](#6-progress-tracker-is-it-working). |
 | **Circles** | Anonymous groups by goal, with posts tagged by the child's age band. Each parent gets a different nickname in each circle. Three post types: question, **what worked** (tied to a win, with an outcome) and sharing. Questions get a cited "ParentPal guide" reply straight away. "What worked" reports add up to a "Parents like you: 5 of 7 said it helped" line on the win. Every post and reply is moderated before anyone sees it. See [How Circles work](#how-circles-work). |
 | **Family playbook** | Share the wins you're trying, with the exact words to say, with grandparents, the other parent, a nanny or a teacher. Each person gets a private link that needs no app or login. They can send back "It worked" or "It was tough" plus a note, which lands in the child's Story as "Logged by Nani" and counts towards patterns. See [Feature brief: Family Playbook](#feature-brief-family-playbook). |
+| **Two children** | A switcher (shown only with two children) picks which child Home, Story, Ask and the goal screens are about. Moments, patterns, progress and chat answers are that child's; caregiver links and Circles posts say which child they're for. See [Two children](#7-two-children-a-switcher-for-the-whole-app). |
 | **Profile** | Family profile you can edit (names, role, birth dates, add or remove a child), sign in / create account (upgrades the guest account), forgot password (emailed 6-digit code), sign out, bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
 | **Safety** | A rule-based red-flag check runs on every chat message and moment *before* any LLM call. Covered: medical emergencies, abuse, self-harm, developmental concerns. On a match the app skips the advice and shows fixed safety guidance instead. |
 
 ## What's new: features built on top of the original idea
 
-The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Three larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
+The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
 
 | | Feature | One line |
 |---|---|---|
@@ -35,6 +36,7 @@ The first version of ParentPal follows the original product: goals and wins, an 
 | 4 | [**Quality work**](#4-quality-work-behind-these-features) | 26 new automated tests, live-model checks, and three new entries in the AI mistakes log. |
 | 5 | [**Bug-fix pass**](#5-bug-fix-pass) | A review of the whole app: paid content no longer leaks through chat, no more 500s from odd input, and screens that used to fail silently now say so. |
 | 6 | [**Progress tracker**](#6-progress-tracker-is-it-working) | Each try of a win gets an outcome, so parents see what's working, get a next step, and see week 1 against this week. |
+| 7 | [**Two children**](#7-two-children-a-switcher-for-the-whole-app) | A child switcher on Home, Story and Ask; moments, patterns, progress, chat, caregiver links and Circles follow the chosen child. |
 
 ### 1. Circles: anonymous parent community
 
@@ -218,6 +220,35 @@ A review of the API and the mobile app turned up a set of real bugs, all fixed. 
 **Built with:** `win_tries` table (migration `0005_win_tries.sql`), `services/progress.ts`, `routes/progress.ts`, `mine` (with `advice`) on each win in `GET /goals/:slug`, and the mobile `components/Progress.tsx`. The seed script now updates wins in place and deletes only removed ones, because deleting a win cascades to parents' tries and playbook choices.
 
 **Tests:** `test/progress.test.ts` (11) covers reusing open tries, locked wins, ownership, counts per goal and win, open tries expiring, notes becoming linked moments (including the safety path), caregiver reports, account deletion, the chat context, every advice rule (including the locked-win case and wrap-around), and the trend windows. 95 tests in total, all passing.
+
+### 7. Two children: a switcher for the whole app
+
+**Why.** Onboarding let parents add a second child, but after that the app only looked at the first one. Home, Story and Ask showed the first child's name. Story listed both children's moments together under that name. **I'll try this** always counted the try against the first child, so a win tried with a younger sibling showed up as the older one's progress. Caregiver links, Circles labels and daily tips also used only the first child.
+
+**What the parent sees**
+
+| Where | What it shows |
+|---|---|
+| **Home, Story, Ask, All moments** | Chips with each child's name, under the title (Ask: above the message box). Only shown with two children. The choice is shared by every screen and remembered on the phone. |
+| **Home and Story** | The chosen child's name, age, moments, patterns and progress only. |
+| **New moment** | Starts on the chosen child. Logging a moment for the other child switches the app to them. |
+| **Goal screen** | "Trying these with [Mo] [Ada]". **I'll try this**, "You tried this 4×", the next-step note and the week 1 / this week card are all per child. |
+| **Check-in notification** | One per win and child, naming the child ("Tap to note what happened with Ada"). Trying the same win with both children asks about each. |
+| **Ask** | The answer is about the chosen child: their age, their recent moments and how their wins went. Suggested questions use their name. |
+| **Family playbook** | "This link is for [Mo] [Ada]" when adding someone. Their page shows that child's name and their notes go into that child's Story. Each person in the list says who they're for. |
+| **Circles** | The default age filter and the "Mom of a 2-year-old" label follow the chosen child. A new post asks "This post is about"; other parents still see only the age. Replies use the chosen child. |
+| **Daily tips** | Children take turns by day, so each gets tips in their name and for their age. |
+
+**Rules**
+
+- **Where the choice lives:** on the phone only (`parentpal.activeChild`), not the server, so two parents on two phones can each look at a different child. It's cleared on sign out. If the saved child was removed, the app falls back to the first child.
+- **API:** the affected routes take an optional `childId` (see [API](#api)). Without it, lists cover every child and everything else uses the first child, exactly as before, so single-child families and older app builds are unchanged. Another family's child id returns 404.
+- **Chat:** with a child chosen, the family context puts that child first, uses only their moments and progress, and adds "This question is about: Ada". An unknown id is ignored rather than failing a reply that has already started streaming.
+- **Privacy:** Circles still replaces every child's nickname in posts, not just the chosen one.
+
+**Built with:** `lib/children.ts` (`pickChild()`), a `childId` filter in `services/progress.ts`, `routes/story.ts`, `services/context.ts`, `services/community.ts` and `services/playbook.ts`, child rotation in `services/dailyTips.ts`; on mobile `useActiveChild()` in `lib/session.tsx`, `components/ChildSwitcher.tsx`, and query keys that include the child id. No migration: moments, patterns, tries and caregiver links already stored their child.
+
+**Tests:** `test/siblings.test.ts` (7) covers separate progress and goal-screen counts per child, separate open tries, moments and patterns per child, rejecting another family's child on every route, caregiver links for the chosen child, Circles age bands, and the chat context focus. 111 tests in total, all passing.
 
 ## Feature brief: Circles
 
@@ -633,6 +664,8 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`, `GET /admin/community/queue`, `POST /admin/community/:type/:id` (`approve` or `remove`)
 
 `GET /health` (no auth) reports which LLM provider is active.
+
+**Two children:** `GET /moments`, `/patterns`, `/progress`, `/goals/:slug`, `/circles` and `/chat/starters` take an optional `?childId=`, and `POST /tries`, `/chat/messages`, `/caregivers`, `/circles/:goal/posts` and `/posts/:id/replies` an optional `childId`. The app sends the child picked in its switcher (stored on the phone). Without it, lists cover every child and everything else uses the first child, so single-child families and older app builds behave as before. Daily tips take turns between children by day.
 
 **Rate limits** (`apps/api/src/lib/rateLimit.ts`): requests count against the signed-in user, or the IP without a valid token. Every route has a ceiling of 300 a minute. Tighter limits: guest creation 20/hour, login 10 and reset 10 per 15 minutes, forgot-password 5/hour (all per IP), register 10/hour, chat messages 40/hour, moments 30/hour, pattern generation 10/hour and caregiver notes 20/hour per IP. Over the limit returns `429` with a `retry-after` header and a readable message.
 

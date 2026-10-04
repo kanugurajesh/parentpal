@@ -24,7 +24,11 @@ const Id = z.object({ id: z.string().uuid() });
 export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("preHandler", requireUser);
 
-  app.get("/circles", { schema: { response: { 200: CirclesResponse } } }, (req) => listCircles(req.userId));
+  app.get(
+    "/circles",
+    { schema: { querystring: z.object({ childId: z.string().uuid().optional() }), response: { 200: CirclesResponse } } },
+    (req) => listCircles(req.userId, req.query.childId),
+  );
 
   app.get(
     "/circles/:goal/posts",
@@ -59,7 +63,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     "/posts/:id/replies",
     { schema: { params: Id, body: CreateReply, response: { 200: CreateReplyResponse } } },
-    (req) => createReply(req.userId, req.params.id, req.body.body),
+    (req) => createReply(req.userId, req.params.id, req.body.body, req.body.childId),
   );
 
   app.delete("/replies/:id", { schema: { params: Id } }, (req) => deleteOwn(req.userId, "reply", req.params.id));

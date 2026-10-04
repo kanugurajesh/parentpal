@@ -187,10 +187,15 @@ export async function removeCheckIn(match: { winId?: string; tryId?: string }) {
   await syncNotifications();
 }
 
-export async function addCheckIn(win: { id: string; title: string }, goalSlug: string, tryId?: string) {
+export async function addCheckIn(win: { id: string; title: string }, goalSlug: string, tryId?: string, child?: { id: string; nickname: string }) {
   await load();
   const dueDate = addDaysISO(localDateISO(), 1);
-  await saveCheckIns([...state.checkIns.filter((c) => c.winId !== win.id), { winId: win.id, winTitle: win.title, goalSlug, tryId, dueDate }]);
+  // One check-in per win and child: trying the same win with both children asks about each.
+  const same = (c: CheckIn) => c.winId === win.id && c.childId === child?.id;
+  await saveCheckIns([
+    ...state.checkIns.filter((c) => !same(c)),
+    { winId: win.id, winTitle: win.title, goalSlug, tryId, childId: child?.id, childName: child?.nickname, dueDate },
+  ]);
   await syncNotifications();
 }
 
@@ -228,7 +233,7 @@ async function doSync() {
     now: new Date(),
     checkIns: live,
     tips,
-    child: me?.children[0]?.nickname,
+    child: me?.children.length ? me.children.map((c) => c.nickname).join(" or ") : undefined,
     lastActivity: moments && latest ? localDateISO(new Date(latest)) : null,
   });
 

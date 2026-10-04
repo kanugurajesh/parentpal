@@ -8,6 +8,7 @@ import { Icon } from "@/components/Icon";
 import { Button, ErrorNote, Loading, Screen, T, styles as ui } from "@/components/ui";
 import { api } from "@/lib/api";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
+import { useActiveChild } from "@/lib/session";
 
 const GUIDELINES = [
   "Anonymous: you get a different nickname in each circle",
@@ -43,7 +44,8 @@ function CircleRow({ circle }: { circle: Circle }) {
 }
 
 export default function Circles() {
-  const q = useQuery({ queryKey: ["circles"], queryFn: api.circles });
+  const child = useActiveChild();
+  const q = useQuery({ queryKey: ["circles", child?.id], queryFn: () => api.circles(child?.id) });
   const mine = q.data?.circles.filter((c) => c.mine) ?? [];
   const others = q.data?.circles.filter((c) => !c.mine) ?? [];
 

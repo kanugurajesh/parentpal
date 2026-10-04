@@ -7,10 +7,13 @@ import { openPost, PostCard } from "@/components/PostCard";
 import { Button, Chip, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
+import { useActiveChild } from "@/lib/session";
 
 export default function CircleFeed() {
   const { goal } = useLocalSearchParams<{ goal: GoalSlug }>();
-  const circles = useQuery({ queryKey: ["circles"], queryFn: api.circles });
+  const child = useActiveChild();
+  // The default age filter is the active child's band.
+  const circles = useQuery({ queryKey: ["circles", child?.id], queryFn: () => api.circles(child?.id) });
   const circle = circles.data?.circles.find((c) => c.goalSlug === goal);
   const myBand = circles.data?.myAgeBand ?? null;
   const canPost = circles.data?.canPost ?? false;

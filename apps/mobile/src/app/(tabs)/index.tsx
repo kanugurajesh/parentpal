@@ -17,7 +17,8 @@ import { Pebble } from "@/components/Pebble";
 import { progressLine } from "@/components/Progress";
 import { Button, Chip, Disclaimer, ErrorNote, Loading, T } from "@/components/ui";
 import { api } from "@/lib/api";
-import { usePrimaryChild, useSession } from "@/lib/session";
+import { ChildSwitcher } from "@/components/ChildSwitcher";
+import { useActiveChild, useSession } from "@/lib/session";
 import { categoryColor, color, GUTTER, radius, space } from "@/theme/tokens";
 
 const FILTERS: { id: GoalFilter; label: string }[] = [
@@ -37,15 +38,16 @@ function greeting() {
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { me } = useSession();
-  const child = usePrimaryChild();
+  const child = useActiveChild();
+  const childId = child?.id;
   const [filter, setFilter] = useState<GoalFilter>("all");
   const goals = useQuery({ queryKey: ["goals", filter], queryFn: () => api.goals(filter) });
-  const moments = useQuery({ queryKey: ["moments"], queryFn: api.moments });
-  const progress = useQuery({ queryKey: ["progress"], queryFn: () => api.progress() });
+  const moments = useQuery({ queryKey: ["moments", childId], queryFn: () => api.moments(childId) });
+  const progress = useQuery({ queryKey: ["progress", childId], queryFn: () => api.progress(childId) });
   const advisors = useQuery({ queryKey: ["advisors"], queryFn: api.advisors, staleTime: Infinity });
   const subscribed = me?.subscription?.status === "active_fake";
   const name = child?.nickname ?? "Your child";
-  const patterns = useQuery({ queryKey: ["patterns"], queryFn: api.patterns });
+  const patterns = useQuery({ queryKey: ["patterns", childId], queryFn: () => api.patterns(childId) });
   const hasPattern = !!patterns.data?.patterns.length;
   // Safety-flagged moments never feed patterns, so they don't count toward the first one (same as Story).
   const momentCount = moments.data?.moments.filter((m) => m.tagStatus !== "safety").length ?? 0;
@@ -105,6 +107,7 @@ export default function Home() {
             </T>
           ) : null}
         </Animated.View>
+        <ChildSwitcher style={{ paddingHorizontal: GUTTER, marginTop: space.md }} />
 
         {/* Story card */}
         <View style={{ paddingHorizontal: GUTTER, marginTop: space.xl }}>

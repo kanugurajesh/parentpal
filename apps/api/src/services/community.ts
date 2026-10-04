@@ -96,11 +96,14 @@ const author = (userId: string | null, label: string | null, goalSlug: string, v
 /* Viewer                                                              */
 /* ------------------------------------------------------------------ */
 
-async function loadViewer(userId: string) {
+/** childId: which child's age band to use (the app's active child); default the first. Redaction covers every child. */
+async function loadViewer(userId: string, childId?: string) {
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
   if (!user) throw notFound("User");
   const kids = await db.select().from(schema.children).where(eq(schema.children.userId, userId)).orderBy(asc(schema.children.createdAt));
-  const band = kids[0] ? ageBandOf(ageInMonths(kids[0].birthMonth, kids[0].birthYear)) : null;
+  const child = childId ? kids.find((k) => k.id === childId) : kids[0];
+  if (childId && !child) throw notFound("Child");
+  const band = child ? ageBandOf(ageInMonths(child.birthMonth, child.birthYear)) : null;
   return { user, band, nicknames: kids.map((k) => k.nickname) };
 }
 
@@ -209,8 +212,8 @@ async function toReplies(rows: ReplyRow[], goalSlug: string, viewerId: string): 
 /* Reading                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function listCircles(viewerId: string): Promise<{ circles: Circle[]; myAgeBand: AgeBand | null; canPost: boolean }> {
-  const { user, band } = await loadViewer(viewerId);
+export async function listCircles(viewerId: string, childId?: string): Promise<{ circles: Circle[]; myAgeBand: AgeBand | null; canPost: boolean }> {
+  const { user, band } = await loadViewer(viewerId, childId);
   const goals = await db.select().from(schema.goals).orderBy(asc(schema.goals.sort));
   const mine = await db
     .select({ slug: schema.userGoals.goalSlug })
@@ -325,7 +328,7 @@ export async function winCommunityStats(winIds: string[]) {
 /* ------------------------------------------------------------------ */
 
 export async function createPost(viewerId: string, goalSlug: GoalSlug, input: CreatePost): Promise<CreatePostResponse> {
-  const { user, band, nicknames } = await loadViewer(viewerId);
+  const { user, band, nicknames } = await loadViewer(viewerId, input.childId);
   requireMember(user);
   await enforceRate(schema.communityPosts, viewerId, LIMITS.postsPerDay, "posts");
 
@@ -363,8 +366,8 @@ export async function createPost(viewerId: string, goalSlug: GoalSlug, input: Cr
   return { outcome: mod.status, post, safety: null };
 }
 
-export async function createReply(viewerId: string, postId: string, body: string): Promise<CreateReplyResponse> {
-  const { user, band, nicknames } = await loadViewer(viewerId);
+export async function createReply(viewerId: string, postId: string, body: string, childId?: string): Promise<CreateReplyResponse> {
+  const { user, band, nicknames } = await loadViewer(viewerId, childId);
   requireMember(user);
   const post = await visiblePost(viewerId, postId);
   if (post.status !== "live") throw new HttpError(409, "Replies open once this post is approved.");

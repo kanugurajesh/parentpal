@@ -9,6 +9,7 @@ import { SubHeader } from "@/components/SubHeader";
 import { Button, Chip, ErrorNote, Field, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
+import { useActiveChild, useSession } from "@/lib/session";
 import { color, radius, space } from "@/theme/tokens";
 
 const RELATIONS = Object.keys(RELATION_LABELS) as Relation[];
@@ -16,7 +17,8 @@ const RELATIONS = Object.keys(RELATION_LABELS) as Relation[];
 const reshareText = (c: Caregiver, child: string) =>
   `Hi ${c.name}! Here's what we're trying with ${child} at the moment, with the exact words we're using. You can tell me how it went right on the page, no app needed:\n${c.url}`;
 
-function CaregiverRow({ c, child, onRemove }: { c: Caregiver; child: string; onRemove: () => void }) {
+function CaregiverRow({ c, showChild, onRemove }: { c: Caregiver; showChild: boolean; onRemove: () => void }) {
+  const child = c.childNickname;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: color.card, borderRadius: radius.card, padding: space.lg, borderWidth: 1.5, borderColor: color.line }}>
       <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: color.apricotTint, alignItems: "center", justifyContent: "center" }}>
@@ -25,7 +27,8 @@ function CaregiverRow({ c, child, onRemove }: { c: Caregiver; child: string; onR
       <View style={{ flex: 1 }}>
         <T variant="bodyStrong">{c.name}</T>
         <T variant="small" color={color.inkMuted}>
-          {RELATION_LABELS[c.relation]} · {c.lastOpenedAt ? `Opened ${timeAgo(c.lastOpenedAt)}` : "Not opened yet"}
+          {RELATION_LABELS[c.relation]}
+          {showChild ? ` · for ${child}` : ""} · {c.lastOpenedAt ? `Opened ${timeAgo(c.lastOpenedAt)}` : "Not opened yet"}
           {c.notesCount ? ` · ${c.notesCount} note${c.notesCount === 1 ? "" : "s"}` : ""}
         </T>
       </View>
@@ -42,6 +45,12 @@ export default function Family() {
   const q = useQuery({ queryKey: ["playbook"], queryFn: api.playbook });
   const [name, setName] = useState("");
   const [relation, setRelation] = useState<Relation>("grandparent");
+  const { me } = useSession();
+  const kids = me?.children ?? [];
+  const active = useActiveChild();
+  // Which child a new link is for; starts on the child the app is showing.
+  const [forChild, setForChild] = useState<string | null>(null);
+  const linkChild = kids.find((k) => k.id === forChild) ?? active;
   const [error, setError] = useState<string | null>(null);
 
   const setData = (data: PlaybookResponse) => qc.setQueryData(["playbook"], data);
@@ -58,7 +67,8 @@ export default function Family() {
   });
 
   const data = q.data;
-  const child = data?.childNickname ?? "your child";
+  // With two children the intro talks about the family; each link names its own child.
+  const child = kids.length > 1 ? "your children" : (data?.childNickname ?? "your child");
   const shared = new Set(data?.wins.map((w) => w.id));
 
   // Arriving from a win's "Send to family": add that win once.
@@ -109,7 +119,7 @@ export default function Family() {
           <View style={{ backgroundColor: color.mossTint, borderRadius: radius.card, padding: space.lg, gap: space.sm }}>
             <T variant="bodyStrong">Children learn faster when every adult responds the same way.</T>
             <T variant="small" color={color.inkSoft}>
-              Send grandparents, the other parent, a nanny or a teacher a private link with what you're trying with {child} and the exact words to use. They don't need the app, and they can tell you how it went. Their notes appear in {child}'s Story and help spot patterns.
+              Send grandparents, the other parent, a nanny or a teacher a private link with what you're trying with {child} and the exact words to use. They don't need the app, and they can tell you how it went. Their notes appear in {kids.length > 1 ? "that child's" : `${child}'s`} Story and help spot patterns.
             </T>
           </View>
 
@@ -149,7 +159,7 @@ export default function Family() {
               Shared with
             </T>
             {data.caregivers.length ? (
-              data.caregivers.map((c) => <CaregiverRow key={c.id} c={c} child={child} onRemove={() => void remove(c)} />)
+              data.caregivers.map((c) => <CaregiverRow key={c.id} c={c} showChild={kids.length > 1} onRemove={() => void remove(c)} />)
             ) : (
               <T color={color.inkMuted}>Nobody yet. Add the first person below.</T>
             )}
@@ -167,12 +177,27 @@ export default function Family() {
                   <Chip key={r} label={RELATION_LABELS[r]} selected={relation === r} onPress={() => setRelation(r)} />
                 ))}
               </View>
+              {kids.length > 1 ? (
+                <View style={{ gap: space.sm }}>
+                  <T variant="smallStrong" color={color.inkSoft}>
+                    This link is for
+                  </T>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }} accessibilityRole="radiogroup">
+                    {kids.map((k) => (
+                      <Chip key={k.id} label={k.nickname} selected={k.id === linkChild?.id} onPress={() => setForChild(k.id)} />
+                    ))}
+                  </View>
+                  <T variant="small" color={color.inkMuted}>
+                    {`Their page shows ${linkChild?.nickname ?? "this child"}'s name, and their notes go into ${linkChild?.nickname ?? "this child"}'s Story.`}
+                  </T>
+                </View>
+              ) : null}
               <Button
                 label="Create link and share"
                 icon="share"
                 disabled={!name.trim() || !data.wins.length}
                 loading={add.isPending}
-                onPress={() => add.mutate({ name: name.trim(), relation })}
+                onPress={() => add.mutate({ name: name.trim(), relation, childId: linkChild?.id })}
               />
               {!data.wins.length ? (
                 <T variant="small" color={color.inkMuted}>

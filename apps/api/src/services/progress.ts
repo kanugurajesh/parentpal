@@ -13,6 +13,7 @@ import {
   type WorkedOutcome,
 } from "@parentpal/shared";
 import { db, schema } from "../db/client";
+import { pickChild } from "../lib/children";
 import { badRequest, HttpError, notFound } from "../lib/errors";
 import { iso } from "../lib/serialize";
 import { isSubscribed } from "./entitlement";
@@ -62,11 +63,13 @@ async function toWinTries(rows: TryRow[]): Promise<WinTry[]> {
 }
 
 async function ownedChild(userId: string, childId?: string) {
-  const where = childId ? and(eq(schema.children.userId, userId), eq(schema.children.id, childId)) : eq(schema.children.userId, userId);
-  const [child] = await db.select().from(schema.children).where(where).orderBy(asc(schema.children.createdAt)).limit(1);
-  if (!child) throw childId ? notFound("Child") : badRequest("Add your child first.");
+  const child = await pickChild(userId, childId);
+  if (!child) throw badRequest("Add your child first.");
   return child;
 }
+
+/** Narrows tries to one child when asked; without a childId every child's tries count (older apps). */
+const forChild = (childId?: string) => (childId ? eq(schema.winTries.childId, childId) : undefined);
 
 /** "I'll try this". Reuses the open try for the same win, so tapping twice doesn't count twice. */
 export async function startTry(userId: string, input: StartTry): Promise<WinTry> {
@@ -134,7 +137,8 @@ function count(c: ReturnType<typeof emptyCounts>, outcome: WorkedOutcome) {
   c[outcome]++;
 }
 
-export async function getProgress(userId: string): Promise<ProgressResponse> {
+export async function getProgress(userId: string, childId?: string): Promise<ProgressResponse> {
+  if (childId) await pickChild(userId, childId); // 404 for someone else's child
   const goals = await db
     .select({ slug: schema.goals.slug, title: schema.goals.title })
     .from(schema.userGoals)
@@ -147,7 +151,7 @@ export async function getProgress(userId: string): Promise<ProgressResponse> {
     ? await db
         .select()
         .from(schema.winTries)
-        .where(and(eq(schema.winTries.userId, userId), inArray(schema.winTries.goalSlug, slugs), isNotNull(schema.winTries.outcome)))
+        .where(and(eq(schema.winTries.userId, userId), forChild(childId), inArray(schema.winTries.goalSlug, slugs), isNotNull(schema.winTries.outcome)))
         .orderBy(asc(schema.winTries.reportedAt))
     : [];
   const wins = slugs.length
@@ -178,19 +182,19 @@ export async function getProgress(userId: string): Promise<ProgressResponse> {
   const open = await db
     .select()
     .from(schema.winTries)
-    .where(and(eq(schema.winTries.userId, userId), isNull(schema.winTries.outcome), gte(schema.winTries.createdAt, openSince())))
+    .where(and(eq(schema.winTries.userId, userId), forChild(childId), isNull(schema.winTries.outcome), gte(schema.winTries.createdAt, openSince())))
     .orderBy(desc(schema.winTries.createdAt));
   return { goals: progress, openTries: await toWinTries(open) };
 }
 
 /** The family's own record per win, for the goal screen. */
-export async function winProgress(userId: string, winIds: string[]) {
+export async function winProgress(userId: string, winIds: string[], childId?: string) {
   const out = new Map<string, { tried: number; helped: number; openTryId: string | null; outcomes: WorkedOutcome[] }>();
   if (!winIds.length) return out;
   const rows = await db
     .select()
     .from(schema.winTries)
-    .where(and(eq(schema.winTries.userId, userId), inArray(schema.winTries.winId, winIds)))
+    .where(and(eq(schema.winTries.userId, userId), forChild(childId), inArray(schema.winTries.winId, winIds)))
     .orderBy(desc(schema.winTries.createdAt));
   const since = openSince().getTime();
   for (const id of winIds) {
@@ -245,8 +249,8 @@ export function adviceFor(outcomes: WorkedOutcome[], next: { id: string; positio
 }
 
 /** One line for the chat context: which wins have helped lately. */
-export async function describeProgress(userId: string): Promise<string | null> {
-  const { goals } = await getProgress(userId);
+export async function describeProgress(userId: string, childId?: string): Promise<string | null> {
+  const { goals } = await getProgress(userId, childId);
   const lines = goals.flatMap((g) => g.wins.map((w) => `${w.title} (${g.goalTitle}): helped ${w.helped} of ${w.tried} tries`));
   return lines.length ? lines.join("; ") : null;
 }

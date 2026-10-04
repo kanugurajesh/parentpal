@@ -18,8 +18,12 @@ async function ownedChild(userId: string, childId: string) {
   return c;
 }
 
-export async function listPatterns(userId: string) {
-  const rows = await db.select().from(schema.patterns).where(eq(schema.patterns.userId, userId)).orderBy(desc(schema.patterns.createdAt));
+export async function listPatterns(userId: string, childId?: string) {
+  const rows = await db
+    .select()
+    .from(schema.patterns)
+    .where(and(eq(schema.patterns.userId, userId), childId ? eq(schema.patterns.childId, childId) : undefined))
+    .orderBy(desc(schema.patterns.createdAt));
   if (!rows.length) return [];
   const links = await db
     .select()
@@ -57,9 +61,11 @@ export const storyRoutes: FastifyPluginAsyncZod = async (app) => {
     return { deleted: true };
   });
 
-  app.get("/patterns", { schema: { response: { 200: z.object({ patterns: z.array(Pattern) }) } } }, async (req) => ({
-    patterns: await listPatterns(req.userId),
-  }));
+  app.get(
+    "/patterns",
+    { schema: { querystring: z.object({ childId: z.string().uuid().optional() }), response: { 200: z.object({ patterns: z.array(Pattern) }) } } },
+    async (req) => ({ patterns: await listPatterns(req.userId, req.query.childId) }),
+  );
 
   app.post(
     "/patterns/generate",

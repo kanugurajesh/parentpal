@@ -4,13 +4,17 @@ import { View } from "react-native";
 import { MomentCard } from "@/components/MomentCard";
 import { Button, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ChildSwitcher } from "@/components/ChildSwitcher";
 import { confirm } from "@/lib/confirm";
+import { useActiveChild } from "@/lib/session";
 import { color, space } from "@/theme/tokens";
 
 export default function AllMoments() {
   const qc = useQueryClient();
-  const moments = useQuery({ queryKey: ["moments"], queryFn: api.moments });
-  const patterns = useQuery({ queryKey: ["patterns"], queryFn: api.patterns });
+  const child = useActiveChild();
+  const childId = child?.id;
+  const moments = useQuery({ queryKey: ["moments", childId], queryFn: () => api.moments(childId) });
+  const patterns = useQuery({ queryKey: ["patterns", childId], queryFn: () => api.patterns(childId) });
   const linked = new Set(patterns.data?.patterns.flatMap((p) => p.momentIds) ?? []);
   const remove = useMutation({
     mutationFn: api.deleteMoment,
@@ -31,8 +35,9 @@ export default function AllMoments() {
       </View>
       <View style={{ gap: space.lg }}>
         <T variant="h1" accessibilityRole="header">
-          All moments
+          {child ? `${child.nickname}'s moments` : "All moments"}
         </T>
+        <ChildSwitcher />
         {moments.isLoading ? <Loading /> : null}
         {moments.error ? <ErrorNote message={(moments.error as Error).message} onRetry={() => moments.refetch()} /> : null}
         {remove.error ? <ErrorNote message={(remove.error as Error).message} /> : null}

@@ -15,5 +15,9 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req) => reportOutcome(req.userId, req.params.id, req.body),
   );
 
-  app.get("/progress", { schema: { response: { 200: ProgressResponse } } }, async (req) => getProgress(req.userId));
+  app.get(
+    "/progress",
+    { schema: { querystring: z.object({ childId: z.string().uuid().optional() }), response: { 200: ProgressResponse } } },
+    async (req) => getProgress(req.userId, req.query.childId),
+  );
 };

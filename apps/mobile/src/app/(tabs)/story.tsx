@@ -10,7 +10,8 @@ import { PatternCard } from "@/components/PatternCard";
 import { Pebble } from "@/components/Pebble";
 import { Button, ErrorNote, Loading, Screen, T, styles as ui } from "@/components/ui";
 import { api } from "@/lib/api";
-import { usePrimaryChild } from "@/lib/session";
+import { ChildSwitcher } from "@/components/ChildSwitcher";
+import { useActiveChild } from "@/lib/session";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
 
 /** One pebble per moment needed for the first pattern, coloured like the welcome cairn. */
@@ -52,10 +53,11 @@ function PatternExplainer() {
 }
 
 export default function Story() {
-  const child = usePrimaryChild();
+  const child = useActiveChild();
+  const childId = child?.id;
   const name = child?.nickname ?? "your child";
-  const moments = useQuery({ queryKey: ["moments"], queryFn: api.moments });
-  const patterns = useQuery({ queryKey: ["patterns"], queryFn: api.patterns });
+  const moments = useQuery({ queryKey: ["moments", childId], queryFn: () => api.moments(childId) });
+  const patterns = useQuery({ queryKey: ["patterns", childId], queryFn: () => api.patterns(childId) });
   const list = moments.data?.moments ?? [];
   const count = list.filter((m) => m.tagStatus !== "safety").length;
   const latestPattern = patterns.data?.patterns[0];
@@ -63,9 +65,12 @@ export default function Story() {
   return (
     <Screen>
       <View style={{ paddingTop: space.lg, gap: space.xl }}>
-        <T variant="h1" accessibilityRole="header">
-          {child ? `${name}'s Story` : "Story"}
-        </T>
+        <View style={{ gap: space.md }}>
+          <T variant="h1" accessibilityRole="header">
+            {child ? `${name}'s Story` : "Story"}
+          </T>
+          <ChildSwitcher />
+        </View>
 
         {moments.isLoading ? <Loading /> : null}
         {moments.error ? <ErrorNote message={(moments.error as Error).message} onRetry={() => moments.refetch()} /> : null}

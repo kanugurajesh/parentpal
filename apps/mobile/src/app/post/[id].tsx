@@ -11,6 +11,7 @@ import { SafetyCard } from "@/components/SafetyCard";
 import { Disclaimer, ErrorNote, IconButton, Loading, Screen, T, styles as ui } from "@/components/ui";
 import { api } from "@/lib/api";
 import { color, GUTTER, radius, space } from "@/theme/tokens";
+import { useActiveChild } from "@/lib/session";
 
 function GuideReply({ reply }: { reply: CommunityReply }) {
   return (
@@ -38,7 +39,8 @@ export default function PostScreen() {
   const qc = useQueryClient();
   const key = ["post", id];
   const q = useQuery({ queryKey: key, queryFn: () => api.post(id) });
-  const circles = useQuery({ queryKey: ["circles"], queryFn: api.circles });
+  const child = useActiveChild();
+  const circles = useQuery({ queryKey: ["circles", child?.id], queryFn: () => api.circles(child?.id) });
   const canPost = circles.data?.canPost ?? false;
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -49,7 +51,8 @@ export default function PostScreen() {
   const refresh = () => Promise.all(invalidate.map((queryKey) => qc.invalidateQueries({ queryKey })));
 
   const send = useMutation({
-    mutationFn: () => api.reply(id, text.trim()),
+    // The reply's "Mom of a 2-year-old" label follows the active child.
+    mutationFn: () => api.reply(id, text.trim(), child?.id),
     onSuccess: async (res) => {
       setSafety(res.safety);
       setNotice(res.outcome === "review" ? "Thanks! Your reply will appear once a moderator has checked it." : null);

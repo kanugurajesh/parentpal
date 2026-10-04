@@ -17,7 +17,8 @@ import {
   updatePrefs,
   useNotificationState,
 } from "@/lib/notifications";
-import { useSession } from "@/lib/session";
+import { ChildSwitcher } from "@/components/ChildSwitcher";
+import { useActiveChild, useSession } from "@/lib/session";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
 
 /**
@@ -28,12 +29,13 @@ function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
   const qc = useQueryClient();
   const { prefs } = useNotificationState();
   const { me, refreshMe } = useSession();
+  const child = useActiveChild();
   const openTryId = win.mine?.openTryId ?? null;
   const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["goal", goalSlug] }), qc.invalidateQueries({ queryKey: ["progress"] })]);
 
   const start = useMutation({
     mutationFn: async () => {
-      const t = await api.startTry(win.id);
+      const t = await api.startTry(win.id, child?.id);
       await refresh();
       if (!NOTIFICATIONS_SUPPORTED) return;
       // With the account switch off nothing is scheduled, so a pending check-in would never arrive.
@@ -53,14 +55,15 @@ function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
           await refreshMe();
         }
       }
-      await addCheckIn(win, goalSlug, t.id);
+      await addCheckIn(win, goalSlug, t.id, child ?? undefined);
     },
   });
 
   const report = useMutation({
     mutationFn: async (outcome: WorkedOutcome) => {
       await api.reportOutcome(openTryId!, { outcome });
-      await removeCheckIn({ winId: win.id });
+      // By try, not win: the other child may have a check-in for the same win.
+      await removeCheckIn({ tryId: openTryId! });
       await refresh();
     },
   });
@@ -206,11 +209,14 @@ function WinCard({ win, accent, goalSlug }: { win: Win; accent: string; goalSlug
 
 export default function GoalScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const goal = useQuery({ queryKey: ["goal", slug], queryFn: () => api.goal(slug) });
+  const child = useActiveChild();
+  const { me } = useSession();
+  // "You tried this 4×" and the progress card are the active child's.
+  const goal = useQuery({ queryKey: ["goal", slug, child?.id], queryFn: () => api.goal(slug, child?.id) });
   const g = goal.data;
   const tone = g ? categoryColor[g.category] : categoryColor.emotion;
   const locked = g?.wins.filter((w) => w.locked).length ?? 0;
-  const progress = useQuery({ queryKey: ["progress"], queryFn: () => api.progress() });
+  const progress = useQuery({ queryKey: ["progress", child?.id], queryFn: () => api.progress(child?.id) });
   const mine = progress.data?.goals.find((p) => p.goalSlug === slug);
 
   return (
@@ -235,6 +241,14 @@ export default function GoalScreen() {
 
           {g.hasContent ? (
             <>
+              {(me?.children.length ?? 0) > 1 ? (
+                <View style={{ gap: space.sm }}>
+                  <T variant="smallStrong" color={color.inkSoft}>
+                    Trying these with
+                  </T>
+                  <ChildSwitcher />
+                </View>
+              ) : null}
               {mine?.tried ? <ProgressCard progress={mine} /> : null}
               <View style={{ gap: space.md }}>
                 <T variant="h2" accessibilityRole="header">

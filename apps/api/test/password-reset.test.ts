@@ -24,7 +24,7 @@ async function account() {
 /** The route sends mail after replying; tests issue the code directly so they can wait for it. */
 async function codeFor(email: string) {
   await issueResetCode(email, app.log);
-  const mail = testOutbox.findLast((m) => m.to === email);
+  const mail = [...testOutbox].reverse().find((m) => m.to === email);
   return mail?.text.match(/\b(\d{6})\b/)?.[1];
 }
 

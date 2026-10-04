@@ -316,6 +316,8 @@ export const SendMessage = z.object({
   text: z.string().trim().min(1).max(2000),
   /** Set when the user tapped an option from a clarifying question. */
   clarifies: z.string().uuid().optional(),
+  /** The child the question is about (the app's active child). Default: the first child. */
+  childId: z.string().uuid().optional(),
 });
 export type SendMessage = z.infer<typeof SendMessage>;
 
@@ -449,7 +451,7 @@ export type Circle = z.infer<typeof Circle>;
 
 export const CirclesResponse = z.object({
   circles: z.array(Circle),
-  /** The viewer's age band (first child), used as the default feed filter. */
+  /** The viewer's age band (the requested child, else the first), used as the default feed filter. */
   myAgeBand: AgeBand.nullable(),
   canPost: z.boolean(),
 });
@@ -472,11 +474,13 @@ export const CreatePost = z
     body: z.string().trim().min(POST_MIN, `Write at least ${POST_MIN} characters`).max(POST_MAX),
     winId: z.string().optional(),
     outcome: WorkedOutcome.optional(),
+    /** Which child the post is about: sets its age band. Default: the first child. */
+    childId: z.string().uuid().optional(),
   })
   .refine((p) => p.kind !== "worked" || (p.winId && p.outcome), { message: "Pick the win you tried and how it went", path: ["winId"] });
 export type CreatePost = z.infer<typeof CreatePost>;
 
-export const CreateReply = z.object({ body: z.string().trim().min(2).max(REPLY_MAX) });
+export const CreateReply = z.object({ body: z.string().trim().min(2).max(REPLY_MAX), childId: z.string().uuid().optional() });
 export type CreateReply = z.infer<typeof CreateReply>;
 
 /** live: visible now. review: only the author sees it until a moderator approves. safety: not posted, support shown. */
@@ -543,6 +547,9 @@ export const Caregiver = z.object({
   url: z.string(),
   lastOpenedAt: z.string().nullable(),
   notesCount: z.number().int(),
+  /** The child this link is for: the page shows their name, and notes land in their Story. */
+  childId: z.string().uuid(),
+  childNickname: z.string(),
   createdAt: z.string(),
 });
 export type Caregiver = z.infer<typeof Caregiver>;
@@ -550,6 +557,8 @@ export type Caregiver = z.infer<typeof Caregiver>;
 export const CreateCaregiver = z.object({
   name: z.string().trim().min(1, "Add a name").max(30),
   relation: Relation,
+  /** Default: the first child. */
+  childId: z.string().uuid().optional(),
 });
 export type CreateCaregiver = z.infer<typeof CreateCaregiver>;
 

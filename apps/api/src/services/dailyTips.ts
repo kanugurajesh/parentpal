@@ -81,7 +81,8 @@ async function ensureTip(userId: string, forDate: string, wins: WinRow[]): Promi
   const win = ordered.find((w) => !seenIds.has(w.id)) ?? ordered[seenIds.size % ordered.length];
 
   const kids = await db.select().from(schema.children).where(eq(schema.children.userId, userId)).orderBy(asc(schema.children.createdAt));
-  const child = kids[0];
+  // Two children take turns by day, so both get tips in their name and for their age.
+  const child = kids.length ? kids[Math.floor(Date.parse(forDate) / 86_400_000) % kids.length] : undefined;
   const childLabel = child ? `${child.nickname}, ${formatAge(ageInMonths(child.birthMonth, child.birthYear))}` : "their child";
 
   let body: string;

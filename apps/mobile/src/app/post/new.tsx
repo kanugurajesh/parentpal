@@ -9,6 +9,7 @@ import { SubHeader } from "@/components/SubHeader";
 import { Button, Chip, ErrorNote, Loading, Screen, T, styles as ui } from "@/components/ui";
 import { api } from "@/lib/api";
 import { color, radius, space } from "@/theme/tokens";
+import { useActiveChild, useSession } from "@/lib/session";
 
 const PLACEHOLDER: Record<PostKind, string> = {
   question: "What would you like to ask parents who've been there?",
@@ -20,7 +21,13 @@ const PLACEHOLDER: Record<PostKind, string> = {
 export default function NewPost() {
   const params = useLocalSearchParams<{ goal?: GoalSlug; kind?: PostKind; winId?: string; body?: string }>();
   const qc = useQueryClient();
-  const circles = useQuery({ queryKey: ["circles"], queryFn: api.circles });
+  const { me } = useSession();
+  const kids = me?.children ?? [];
+  const active = useActiveChild();
+  // Which child the post is about: sets its age band and "Mom of a 2-year-old" label.
+  const [about, setAbout] = useState<string | null>(null);
+  const aboutChild = kids.find((k) => k.id === about) ?? active;
+  const circles = useQuery({ queryKey: ["circles", aboutChild?.id], queryFn: () => api.circles(aboutChild?.id) });
   const [goal, setGoal] = useState<GoalSlug | null>(params.goal ?? null);
   const chosenGoal = goal ?? circles.data?.circles[0]?.goalSlug ?? null;
   const [kind, setKind] = useState<PostKind>(params.kind ?? "question");
@@ -37,6 +44,7 @@ export default function NewPost() {
       api.createPost(chosenGoal!, {
         kind,
         body: body.trim(),
+        childId: aboutChild?.id,
         ...(kind === "worked" ? { winId: winId ?? undefined, outcome: outcome ?? undefined } : {}),
       }),
     onSuccess: async (res) => {
@@ -107,6 +115,22 @@ export default function NewPost() {
                 <Chip key={c.goalSlug} label={c.title} selected={chosenGoal === c.goalSlug} onPress={() => (setGoal(c.goalSlug), setWinId(null))} />
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {kids.length > 1 ? (
+          <View style={{ gap: space.sm }}>
+            <T variant="smallStrong" color={color.inkSoft}>
+              This post is about
+            </T>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }} accessibilityRole="radiogroup">
+              {kids.map((k) => (
+                <Chip key={k.id} label={k.nickname} selected={k.id === aboutChild?.id} onPress={() => setAbout(k.id)} />
+              ))}
+            </View>
+            <T variant="small" color={color.inkMuted}>
+              Other parents see only the age, never the name.
+            </T>
           </View>
         ) : null}
 

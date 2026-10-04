@@ -264,7 +264,7 @@ export async function answerOnce(
 
 export async function* runChat(
   userId: string,
-  input: { text: string; clarifies?: string },
+  input: { text: string; clarifies?: string; childId?: string },
 ): AsyncGenerator<ChatStreamEvent> {
   const conv = await getOrCreateConversation(userId);
   const userRow = await insertMessage({ conversationId: conv.id, role: "user", kind: "answer", content: input.text });
@@ -309,7 +309,7 @@ export async function* runChat(
     }
   }
 
-  const ctx = await loadFamilyContext(userId);
+  const ctx = await loadFamilyContext(userId, input.childId);
   const chunks = await retrieve(query, { boostGoals: ctx.goals.map((g) => g.slug), limit: 3, subscribed: await isSubscribed(userId) });
   const topScore = chunks[0]?.score ?? 0;
   const wordCount = input.text.split(/\s+/).filter(Boolean).length;

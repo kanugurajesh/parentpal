@@ -35,10 +35,14 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     return { messages: [] };
   });
 
-  app.get("/chat/starters", { schema: { response: { 200: z.object({ starters: z.array(z.string()) }) } } }, async (req) => {
-    const ctx = await loadFamilyContext(req.userId);
-    return { starters: startersFor(ctx.goals.map((g) => g.slug), ctx.children[0]?.nickname) };
-  });
+  app.get(
+    "/chat/starters",
+    { schema: { querystring: z.object({ childId: z.string().uuid().optional() }), response: { 200: z.object({ starters: z.array(z.string()) }) } } },
+    async (req) => {
+      const ctx = await loadFamilyContext(req.userId, req.query.childId);
+      return { starters: startersFor(ctx.goals.map((g) => g.slug), ctx.children[0]?.nickname) };
+    },
+  );
 
   app.get("/chat/topics", { schema: { response: { 200: z.object({ topics: z.array(Topic) }) } } }, async () => ({ topics: TOPICS }));
 

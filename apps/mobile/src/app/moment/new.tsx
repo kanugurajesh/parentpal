@@ -10,21 +10,23 @@ import { SafetyCard } from "@/components/SafetyCard";
 import { Button, Chip, ErrorNote, Field, T } from "@/components/ui";
 import { api } from "@/lib/api";
 import { removeCheckIn, syncNotifications } from "@/lib/notifications";
-import { useSession } from "@/lib/session";
+import { useActiveChild, useSession } from "@/lib/session";
 import { color, space } from "@/theme/tokens";
 
 const PROMPTS = ["What happened just before?", "What did they do?", "How did it end?"];
 
 export default function NewMoment() {
   const qc = useQueryClient();
-  const { me, meError, refreshMe } = useSession();
+  const { me, meError, refreshMe, setActiveChild } = useSession();
+  const active = useActiveChild();
   // Set when opened from a "How did it go?" check-in notification, or from a win on the goal screen.
   const { tried, tryId, goal } = useLocalSearchParams<{ tried?: string; tryId?: string; goal?: string }>();
   const [outcome, setOutcome] = useState<WorkedOutcome | null>(null);
   const kids = me?.children ?? [];
   const [picked, setPicked] = useState<string | null>(null);
   // Derived, not initial state: opened from a notification on cold start, /me may not have loaded yet.
-  const childId = picked ?? kids[0]?.id ?? "";
+  // Defaults to the child the app is showing.
+  const childId = picked ?? active?.id ?? "";
   const [text, setText] = useState(tried ? `Tried "${tried}". ` : "");
   const [result, setResult] = useState<CreateMomentResponse | null>(null);
 
@@ -37,6 +39,8 @@ export default function NewMoment() {
       return res.moment!;
     },
     onSuccess: async (res) => {
+      // Logged a moment about the other child: Story should now show that child.
+      setActiveChild(res.moment.childId);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["moments"] }),
         qc.invalidateQueries({ queryKey: ["patterns"] }),
@@ -56,7 +60,7 @@ export default function NewMoment() {
         footer={<Button label={result.safety ? "Close" : "See it in Story"} onPress={() => (result.safety ? router.back() : (router.back(), router.navigate("/(tabs)/story")))} />}
       >
         {result.safety ? <SafetyCard notice={result.safety} /> : null}
-        {result.newPattern ? <PatternCard pattern={result.newPattern} moments={qc.getQueryData<{ moments: never[] }>(["moments"])?.moments ?? [result.moment]} /> : null}
+        {result.newPattern ? <PatternCard pattern={result.newPattern} moments={qc.getQueryData<{ moments: never[] }>(["moments", result.moment.childId])?.moments ?? [result.moment]} /> : null}
       </OnboardingFrame>
     );
   }

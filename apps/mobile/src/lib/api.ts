@@ -99,6 +99,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+/** `?childId=` when the app has an active child; omitted, the server uses all children or the first. */
+const q = (childId?: string) => (childId ? `?childId=${encodeURIComponent(childId)}` : "");
+
 export const api = {
   guest: () => request<AuthResponse>("POST", "/auth/guest"),
   register: (email: string, password: string) => request<AuthResponse>("POST", "/auth/register", { email, password }),
@@ -115,23 +118,23 @@ export const api = {
   deleteChild: (id: string) => request<{ deleted: true }>("DELETE", `/children/${id}`),
 
   goals: (category: GoalFilter) => request<GoalsResponse>("GET", `/goals?category=${category}`),
-  goal: (slug: string) => request<GoalDetail>("GET", `/goals/${slug}`),
+  goal: (slug: string, childId?: string) => request<GoalDetail>("GET", `/goals/${slug}${q(childId)}`),
   advisors: () => request<Advisor[]>("GET", "/advisors"),
   subscribe: (plan: Plan) => request<Me>("POST", "/subscription", { plan }),
   cancelSubscription: () => request<Me>("DELETE", "/subscription"),
 
-  moments: () => request<{ moments: Moment[] }>("GET", "/moments"),
+  moments: (childId?: string) => request<{ moments: Moment[] }>("GET", `/moments${q(childId)}`),
   addMoment: (childId: string, text: string) => request<CreateMomentResponse>("POST", "/moments", { childId, text }),
   deleteMoment: (id: string) => request<{ deleted: true }>("DELETE", `/moments/${id}`),
-  patterns: () => request<{ patterns: Pattern[] }>("GET", "/patterns"),
+  patterns: (childId?: string) => request<{ patterns: Pattern[] }>("GET", `/patterns${q(childId)}`),
 
   startTry: (winId: string, childId?: string) => request<WinTry>("POST", "/tries", { winId, childId }),
   reportOutcome: (tryId: string, body: ReportOutcome) => request<ReportOutcomeResponse>("POST", `/tries/${tryId}/outcome`, body),
-  progress: () => request<ProgressResponse>("GET", "/progress"),
+  progress: (childId?: string) => request<ProgressResponse>("GET", `/progress${q(childId)}`),
 
   chat: () => request<{ messages: ChatMessage[] }>("GET", "/chat"),
   clearChat: () => request<{ messages: ChatMessage[] }>("DELETE", "/chat"),
-  starters: () => request<{ starters: string[] }>("GET", "/chat/starters"),
+  starters: (childId?: string) => request<{ starters: string[] }>("GET", `/chat/starters${q(childId)}`),
   topics: () => request<{ topics: Topic[] }>("GET", "/chat/topics"),
   feedback: (id: string, rating: 1 | -1) => request<ChatMessage>("POST", `/messages/${id}/feedback`, { rating }),
   bookmark: (id: string, on: boolean) => request<ChatMessage>(on ? "POST" : "DELETE", `/messages/${id}/bookmark`),
@@ -141,13 +144,13 @@ export const api = {
   upcomingTips: () => request<{ notifications: Notification[] }>("GET", `/notifications/upcoming?from=${localDateISO()}&days=3`),
   readNotification: (id: string) => request<Notification>("POST", `/notifications/${id}/read`),
 
-  circles: () => request<CirclesResponse>("GET", "/circles"),
+  circles: (childId?: string) => request<CirclesResponse>("GET", `/circles${q(childId)}`),
   feed: (goal: GoalSlug, band: AgeBand | "all", cursor?: string) =>
     request<FeedResponse>("GET", `/circles/${goal}/posts?band=${encodeURIComponent(band)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
   createPost: (goal: GoalSlug, body: CreatePost) => request<CreatePostResponse>("POST", `/circles/${goal}/posts`, body),
   post: (id: string) => request<PostDetail>("GET", `/posts/${id}`),
   deletePost: (id: string) => request<{ deleted: true }>("DELETE", `/posts/${id}`),
-  reply: (postId: string, body: string) => request<CreateReplyResponse>("POST", `/posts/${postId}/replies`, { body }),
+  reply: (postId: string, body: string, childId?: string) => request<CreateReplyResponse>("POST", `/posts/${postId}/replies`, { body, childId }),
   deleteReply: (id: string) => request<{ deleted: true }>("DELETE", `/replies/${id}`),
   react: (targetType: TargetType, targetId: string, kind: ReactionKind) =>
     request<{ reactions: CommunityReply["reactions"]; myReactions: ReactionKind[] }>("POST", "/reactions", { targetType, targetId, kind }),
@@ -166,7 +169,7 @@ export const api = {
  * Uses expo/fetch, whose response.body is a real ReadableStream on web, iOS and Android.
  */
 export async function streamChat(
-  input: { text: string; clarifies?: string },
+  input: { text: string; clarifies?: string; childId?: string },
   onEvent: (e: ChatStreamEvent) => void,
   signal?: AbortSignal,
 ) {

@@ -10,6 +10,7 @@ import {
   type SafetyNotice,
 } from "@parentpal/shared";
 import { db, schema } from "../db/client";
+import { pickChild } from "../lib/children";
 import { env } from "../env";
 import { badRequest, HttpError, notFound } from "../lib/errors";
 import { iso } from "../lib/serialize";
@@ -89,6 +90,11 @@ async function listCaregivers(userId: string): Promise<Caregiver[]> {
     .where(and(eq(schema.caregivers.userId, userId), isNull(schema.caregivers.revokedAt)))
     .orderBy(asc(schema.caregivers.createdAt));
   if (!rows.length) return [];
+  const nicknames = new Map(
+    (await db.select({ id: schema.children.id, nickname: schema.children.nickname }).from(schema.children).where(eq(schema.children.userId, userId))).map(
+      (c) => [c.id, c.nickname],
+    ),
+  );
   const notes = new Map(
     (
       await db
@@ -105,6 +111,8 @@ async function listCaregivers(userId: string): Promise<Caregiver[]> {
     url: publicUrl(c.token),
     lastOpenedAt: c.lastOpenedAt ? iso(c.lastOpenedAt) : null,
     notesCount: notes.get(c.id) ?? 0,
+    childId: c.childId,
+    childNickname: nicknames.get(c.childId) ?? "your child",
     createdAt: iso(c.createdAt),
   }));
 }
@@ -148,7 +156,7 @@ function shareText(caregiverName: string, childName: string, url: string, from: 
 }
 
 export async function addCaregiver(userId: string, input: CreateCaregiver) {
-  const child = await primaryChild(userId);
+  const child = await pickChild(userId, input.childId);
   if (!child) throw badRequest("Add your child's profile first.");
   const [{ n }] = await db
     .select({ n: count() })

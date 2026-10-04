@@ -10,7 +10,8 @@ import { Icon } from "@/components/Icon";
 import { Button, ErrorNote, Loading, T, styles as ui } from "@/components/ui";
 import { api, streamChat } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
-import { usePrimaryChild } from "@/lib/session";
+import { ChildSwitcher } from "@/components/ChildSwitcher";
+import { useActiveChild } from "@/lib/session";
 import { color, GUTTER, radius, space, type as typeScale } from "@/theme/tokens";
 
 type ChatData = { messages: ChatMessage[] };
@@ -53,9 +54,9 @@ function TopicList({ topics, onAsk, initial }: { topics: Topic[]; onAsk: (q: str
 export default function Ask() {
   const qc = useQueryClient();
   const params = useLocalSearchParams<{ topic?: string }>();
-  const child = usePrimaryChild();
+  const child = useActiveChild();
   const chat = useQuery({ queryKey: ["chat"], queryFn: api.chat });
-  const starters = useQuery({ queryKey: ["starters"], queryFn: api.starters });
+  const starters = useQuery({ queryKey: ["starters", child?.id], queryFn: () => api.starters(child?.id) });
   const topics = useQuery({ queryKey: ["topics"], queryFn: api.topics, staleTime: Infinity });
   const [input, setInput] = useState("");
   const [showTopics, setShowTopics] = useState(!!params.topic);
@@ -97,7 +98,7 @@ export default function Ask() {
     setPending({ user: t, reply: null });
     const append = (m: ChatMessage) => qc.setQueryData<ChatData>(["chat"], (d) => ({ messages: [...(d?.messages ?? []), m] }));
     try {
-      await streamChat({ text: t, clarifies }, (e) => {
+      await streamChat({ text: t, clarifies, childId: child?.id }, (e) => {
         if (e.type === "user") {
           append(e.message);
           setPending((p) => (p ? { ...p, user: "" } : p));
@@ -237,6 +238,9 @@ export default function Ask() {
           ) : null}
           {error ? <ErrorNote message={error} /> : null}
         </ScrollView>
+
+        {/* With two children, which one the next question is about. */}
+        <ChildSwitcher style={{ paddingHorizontal: GUTTER, paddingTop: space.sm, backgroundColor: color.card, borderTopWidth: 1, borderColor: color.line }} />
 
         <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.sm, paddingHorizontal: GUTTER, paddingVertical: space.sm, borderTopWidth: 1, borderColor: color.line, backgroundColor: color.card }}>
           <TextInput
