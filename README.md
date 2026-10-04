@@ -1,8 +1,18 @@
 # ParentPal
 
-An AI parenting companion. Parents log short "moments" about their child, pick a goal or two, get small scripted "wins" to try, and ask questions in a chat. The chat answers from curated, sourced content and from what the parent has logged.
+**An AI parenting companion for parents of young children, built around one simple loop: pick a goal, try a small win, note what happened, and see what's working.**
 
-This is a portfolio MVP. It covers one working path through the app from start to finish, and the docs try to be honest about its limits.
+ParentPal turns expert parenting guidance (AAP, CDC, NHS, AASM) into short, scripted "wins": what to do, the exact words to say, and what to expect. Then it helps parents see whether those wins are working. Parents can:
+
+- **Pick 1–2 goals** out of 14 (tantrums, sleep, picky eating, separation anxiety, sibling rivalry and more) and get wins to try.
+- **Log moments** in a sentence or two. The AI tags each one, and after every three it points out a pattern.
+- **Track progress.** Each try gets an outcome (Helped / A bit / Not yet), a suggested next step and a week-by-week trend.
+- **Ask questions** in a chat that knows the child's age, goals and recent moments, and cites its sources.
+- **Bring other people in.** Share the plan with grandparents, a nanny or a teacher through a link that needs no app, and ask other parents in anonymous, moderated **Circles**.
+
+It handles one or two children, works as a guest with no sign-up, and schedules well-timed reminders on the phone. A safety check runs before any AI call, so messages about emergencies, abuse or self-harm get fixed safety guidance instead of AI advice.
+
+**Stack:** an Expo (React Native) app for iOS, Android and web, a Fastify + Postgres API, and an LLM behind a small provider interface (Groq, OpenAI, or a built-in mock, so the app runs offline with no API keys). This is a portfolio MVP. It covers one working path through the app from start to finish, and the docs try to be honest about its limits.
 
 > **Not medical advice.** All guidance is general, written from public sources, and has not been checked by a clinician. Every AI-generated surface in the app says so.
 
@@ -24,6 +34,160 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Profile** | Family profile you can edit (names, role, birth dates, add or remove a child), sign in / create account (upgrades the guest account), forgot password (emailed 6-digit code), sign out, bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
 | **Safety** | A rule-based red-flag check runs on every chat message and moment *before* any LLM call. Covered: medical emergencies, abuse, self-harm, developmental concerns. On a match the app skips the advice and shows fixed safety guidance instead. |
 
+## Getting started
+
+Runs on Windows, macOS and Linux. No API keys are needed: without one, the app uses a built-in mock LLM, so every screen works offline.
+
+**Quick start** (if you already have Node 22.9+ and Docker running):
+
+```bash
+git clone https://github.com/kanugurajesh/parentpal.git
+cd parentpal
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Then press **`w`** in the terminal to open the app in your browser. The steps below explain each part, and [Troubleshooting](#troubleshooting) covers the usual problems.
+
+### 1. Install the prerequisites
+
+| Tool | Version | Check with | Notes |
+|---|---|---|---|
+| [Node.js](https://nodejs.org) | **22.9 or newer** (tested on 24) | `node -v` | The scripts use `--env-file-if-exists`, which older Node versions don't have. |
+| npm | comes with Node | `npm -v` | The repo is an npm workspace; use npm, not yarn or pnpm. |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Compose v2.17+ | `docker compose version` | Runs Postgres. **Start Docker before running any script.** |
+| Git | any | `git --version` | |
+
+Optional:
+
+- **To see the app on a phone:** the [Expo Go](https://expo.dev/go) app. The project uses **Expo SDK 57**, so install the current Expo Go from the app store.
+- **For an emulator:** Android Studio (Android emulator) or Xcode (iOS simulator, macOS only).
+- **For real AI answers:** a free [Groq API key](https://console.groq.com/keys), or an OpenAI key.
+
+### 2. Clone and install
+
+```bash
+git clone https://github.com/kanugurajesh/parentpal.git
+cd parentpal
+npm install
+```
+
+`npm install` at the root installs the API, the mobile app and the shared package together. It takes a few minutes the first time.
+
+### 3. Create your `.env`
+
+```bash
+cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
+```
+
+The defaults work as they are. Things you may want to change:
+
+| Setting | When to change it |
+|---|---|
+| `JWT_SECRET` | Set any long random string. Required in production; fine as is locally. |
+| `GROQ_API_KEY` (or `OPENAI_API_KEY`) | Add one for real AI answers instead of the mock. |
+| `RESEND_API_KEY` | Only to send real password-reset emails. Without it, the code is printed in the API terminal. |
+
+All settings are listed under [Environment variables](#environment-variables).
+
+### 4. Run it
+
+```bash
+npm run dev
+```
+
+This one command:
+
+1. starts Postgres in Docker on port **5433** (it creates the main and test databases the first time),
+2. runs the database migrations,
+3. seeds the parenting content (14 goals, 26 wins),
+4. starts the API on **http://localhost:4000** and the Expo dev server on port **8081**, side by side.
+
+It's ready when the API has logged that it's listening on port 4000 and Expo shows its QR code. Then open the app:
+
+| Where | How |
+|---|---|
+| **Browser** | Press `w` in the terminal, or run `npm run dev:web` instead of `npm run dev`. |
+| **Phone (same Wi-Fi)** | Scan the QR code with Expo Go (Android) or the Camera app (iOS). See [Running on a phone](#running-on-a-phone). |
+| **Android emulator** | Start the emulator, then press `a`. |
+| **iOS simulator** (macOS) | Press `i`. |
+
+Check that the API is up: open http://localhost:4000/health. It shows which LLM is in use (`mock`, `groq` or `openai`).
+
+Stop everything with `Ctrl+C`. Postgres keeps running in the background; `npm run db:down` stops it.
+
+### 5. Try it out
+
+There are no demo logins: the app is guest-first, so every flow starts from a fresh profile.
+
+1. **Onboarding:** add a child (and optionally a second one), pick 1–2 goals, then close the paywall to use the free tier.
+2. **Story:** log three moments about the child. A pattern appears after the third.
+3. **Ask:** ask a question, e.g. "How do I handle tantrums at bedtime?". Answers cite their sources.
+4. **Goals:** open a goal, tap **I'll try this** on win 1, then record how it went.
+5. **Account:** Profile → **Create account**. To test **Forgot password**, sign out, tap *Forgot password?*, and copy the 6-digit code from the API terminal.
+6. **Two children:** Profile → **Edit** → add a child, then switch between them on Home.
+7. **Unlock everything:** choose any plan on the paywall. It's a fake subscription; no payment is taken.
+
+The Circles review queue and LLM costs are on admin routes that need the `x-admin-key` header (default `dev-admin-key`). See [API](#api).
+
+### Running on a phone
+
+A phone can't use `localhost`, because on the phone that means the phone itself.
+
+- **Same Wi-Fi (the usual case):** nothing to configure. In development the app reaches the API through the same computer the Expo dev server runs on. If the app says it can't reach the server:
+  - allow Node.js through your firewall on **private networks** (Windows asks the first time), and
+  - if it still fails, create `apps/mobile/.env.local` containing `EXPO_PUBLIC_API_URL=http://<your computer's LAN IP>:4000`, then restart `npm run dev`. Expo only reads env files from `apps/mobile`, not the root `.env`.
+- **Different networks, or Wi-Fi that blocks devices from seeing each other:** use the ngrok tunnel. Put `NGROK_AUTHTOKEN` and a free static `NGROK_DOMAIN` from [ngrok](https://dashboard.ngrok.com/domains) in the root `.env`, set `EXPO_PUBLIC_API_URL=https://<NGROK_DOMAIN>` in `apps/mobile/.env.local`, then run `npm run dev:tunnel`.
+- **Notifications** don't work in Expo Go on Android (Expo's limit, not this app's). Use iOS, or an Android development build (`npm run -w @parentpal/mobile android`), to test them.
+
+### Running the tests
+
+```bash
+npm test             # starts Postgres if needed, then runs the 111 API tests
+npm run typecheck    # type-checks every workspace
+npm run eval         # AI eval suite (mock LLM); add -- --judge with a real key
+```
+
+Tests use their own database (`parentpal_test`) and always use the mock LLM, so they're free, offline and never touch your dev data.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `npm run dev` fails at `docker compose` | Docker isn't running. Start Docker Desktop, wait until it says it's running, and try again. |
+| `bad option: --env-file-if-exists` | Node is older than 22.9. Upgrade Node and run `npm install` again. |
+| `port is already allocated` (5433), or `EADDRINUSE` (4000) | Another Postgres or an earlier run is using the port. Stop it, or change the port in `docker-compose.yml` and `DATABASE_URL` / `TEST_DATABASE_URL`, or `PORT`. |
+| Expo says port 8081 is in use | An earlier Expo is still running. Close it, or press `y` to use another port. |
+| The health check shows `openai` or `groq` though you set no key | A key is set in your shell's environment, and shell variables win over `.env`. Unset it, or set `LLM_PROVIDER=mock` in `.env`. |
+| Phone shows "Can't reach ParentPal's server" | See [Running on a phone](#running-on-a-phone): firewall first, then `EXPO_PUBLIC_API_URL`. |
+| Expo Go says the project needs a newer SDK | Update Expo Go from the app store (the project uses SDK 57). |
+| `ERR_NGROK_334` | An earlier tunnel is still running. Stop it, then run `npm run dev:tunnel` again. |
+| `relation ... does not exist` | Migrations didn't run. Run `npm run setup`. |
+| Tests fail with `database "parentpal_test" does not exist` | The test database is only created with a fresh Docker volume. Run `docker compose exec db createdb -U parentpal parentpal_test`, or reset the database (below). |
+| You want a clean database | `docker compose down -v` deletes all local data, then `npm run setup` recreates it. |
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `4000` | API port |
+| `DATABASE_URL` / `TEST_DATABASE_URL` | local docker DBs on `5433` | Postgres connections (the test DB is created by `apps/api/db-init`) |
+| `JWT_SECRET` | dev placeholder | Signs auth tokens. **Change it.** The API won't start in production with the default. |
+| `ADMIN_KEY` | `dev-admin-key` | Required as the `x-admin-key` header on `/v1/admin/*` and `/v1/dev/*`. The API won't start in production with the default. |
+| `LLM_PROVIDER` | auto | `groq`, `openai` or `mock`. Auto-selects `groq`, then `openai`, by which key is present. |
+| `GROQ_API_KEY`, `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq config |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | `gpt-4o-mini` | OpenAI or any OpenAI-compatible endpoint |
+| `LLM_REASONING_EFFORT` | empty | Sent as `reasoning_effort` (`low` recommended for gpt-oss) |
+| `LLM_THINKING_TOKEN_HEADROOM` | `0` | Extra output tokens per call for reasoning models (`512` in `.env.example`) |
+| `LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M` | `0.15`, `0.60` | USD per 1M tokens for cost logging. Check against current pricing. |
+| `DAILY_TIP_CRON` | `0 8 * * *` | Server job that fills the inbox with each user's tip for the day (server local time). Phones also fetch upcoming tips themselves. |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | API base URL for the app (set in `apps/mobile/.env.local`) |
+| `NGROK_AUTHTOKEN`, `NGROK_DOMAIN` | empty | Used by `npm run dev:tunnel` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | empty, `ParentPal <onboarding@resend.dev>` | Sends password-reset codes through [Resend](https://resend.com). Empty: in development the code is printed in the API log; in production nothing is sent and a warning is logged. |
+| `RATE_LIMITS` | `on` | `off` disables rate limits (local load testing only). Tests run without them except `rate-limit.test.ts`. |
+| `TRUST_PROXY` | auto | Trust `X-Forwarded-For` so IP limits see the phone, not the proxy. Auto: on when `NGROK_DOMAIN` is set. Only turn it on behind a proxy you control. |
+
 ## What's new: features built on top of the original idea
 
 The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
@@ -40,7 +204,7 @@ The first version of ParentPal follows the original product: goals and wins, an 
 
 ### 1. Circles: anonymous parent community
 
-**What it is.** One circle per goal (Tantrums, Sleep, Picky eating, Screen time, Focus, Potty training, Keeping busy). Every post carries the child's age band (Under 1, 1 to 2, 2 to 3, 3 to 5, 5 and up), so parents read about children the same age as theirs.
+**What it is.** One circle per goal, so 14 in all (Tantrums, Sleep, Picky eating, Separation anxiety, Sibling rivalry and so on). Every post carries the child's age band (Under 1, 1 to 2, 2 to 3, 3 to 5, 5 and up), so parents read about children the same age as theirs.
 
 **Screens and what's on them**
 
@@ -407,13 +571,17 @@ An npm-workspaces monorepo: one Expo app, one Fastify API, one shared schema pac
  │ apps/mobile  (Expo / RN, TS)  │   HTTPS JSON  /v1/*     │ apps/api  (Fastify 5, TS)                │
  │                               │ ──────────────────────▶ │                                          │
  │ app/        expo-router       │   Bearer JWT            │ routes/    auth · me · goals · story ·   │
- │             screens + tabs    │   (guest or user)       │            chat · notifications · admin  │
- │ lib/api.ts  fetch + SSE       │                         │            (zod-validated in and out)    │
- │ lib/session token storage     │ ◀────────────────────── │ services/  safety → retrieval → chat     │
- │ react-query cache             │   text/event-stream     │            story · context · dailyTips   │
- │ ChatBubble  Markdown + [n]    │   (chat answers)        │ llm/       complete · stream · json<T>   │
- │             citation render   │                         │            + per-call cost/latency log   │
- └───────────────┬───────────────┘                         │ jobs/      daily tip (node-cron)         │
+ │             screens + tabs    │   (guest or user)       │            chat · progress · circles ·   │
+ │ lib/api.ts  fetch + SSE       │                         │            playbook · notifications ·    │
+ │ lib/session token storage     │ ◀────────────────────── │            admin                         │
+ │ react-query cache             │   text/event-stream     │            (zod-validated in and out)    │
+ │ ChatBubble  Markdown + [n]    │   (chat answers)        │ services/  safety → retrieval → chat     │
+ │             citation render   │                         │            story · context · dailyTips   │
+ └───────────────┬───────────────┘                         │            progress · playbook ·         │
+                 │                                         │            community · moderation        │
+                 │                                         │ llm/       complete · stream · json<T>   │
+                 │                                         │            + per-call cost/latency log   │
+                 │                                         │ jobs/      daily tip (node-cron)         │
                  │                                         │ db/        Drizzle ORM + migrations      │
                  │      packages/shared                    └─────┬───────────────────────┬────────────┘
                  └────▶ zod schemas + TS types ◀─────────────────┘                       │
@@ -429,7 +597,7 @@ An npm-workspaces monorepo: one Expo app, one Fastify API, one shared schema pac
 
 | Path | Contents |
 |---|---|
-| `apps/api` | Fastify API: routes, services (chat, retrieval, safety, story, daily tips), LLM adapters, Drizzle schema and migrations, seed script, tests, eval runner |
+| `apps/api` | Fastify API: routes, services (chat, retrieval, safety, story, progress, daily tips, community, moderation, playbook), LLM adapters, Drizzle schema and migrations, seed script, tests, eval runner |
 | `apps/mobile` | Expo / React Native app (iOS, Android, web) using expo-router |
 | `packages/shared` | zod schemas and TypeScript types shared by the API and the app, so request/response shapes can't drift |
 | `content/` | Goals and wins as Markdown, plus `sources.json`. See [`content/README.md`](content/README.md). |
@@ -441,7 +609,7 @@ An npm-workspaces monorepo: one Expo app, one Fastify API, one shared schema pac
 Requests flow **route → service → db / llm**:
 
 - **Routes** (`apps/api/src/routes`) handle HTTP only: auth (`requireUser`), zod validation and response shaping. Everything is mounted under `/v1`.
-- **Services** (`apps/api/src/services`) hold the product logic: `safety` (red-flag rules), `retrieval` (Postgres FTS over content chunks), `context` (child age, goals and recent moments the LLM may see), `chat` (clarify / answer / citation validation), `story` (moment tagging, pattern insights) and `dailyTips`.
+- **Services** (`apps/api/src/services`) hold the product logic: `safety` (red-flag rules), `retrieval` (Postgres FTS over content chunks), `context` (child age, goals and recent moments the LLM may see), `chat` (clarify / answer / citation validation), `story` (moment tagging, pattern insights), `progress` (win tries and outcomes), `dailyTips`, `community` and `moderation` (Circles), `playbook` (caregiver links) and `entitlement` (what's free and what's locked).
 - **LLM** (`apps/api/src/llm`) is the only code that talks to a model. Every call states a `purpose` and a deterministic `mock()` output, and is logged to `llm_calls`.
 - **DB** (`apps/api/src/db`) is the Drizzle schema plus SQL migrations. Every user-owned table cascades from `users`.
 
@@ -449,16 +617,18 @@ Requests flow **route → service → db / llm**:
 
 | Group | Tables |
 |---|---|
-| Accounts | `users`, `children`, `subscriptions` |
+| Accounts | `users`, `children`, `subscriptions`, `password_resets` |
 | Content | `goals`, `wins`, `sources`, `content_chunks`, `user_goals` |
 | Story | `moments`, `patterns`, `pattern_moments` |
 | Progress | `win_tries` (one row per attempt at a win; `outcome` is null until reported) |
 | Chat | `conversations`, `messages`, `message_feedback`, `bookmarks` |
+| Family playbook | `caregivers`, `playbook_wins` |
+| Circles | `community_posts`, `community_replies`, `community_reactions`, `community_reports`, `community_blocks`, `community_notices` |
 | Ops | `notifications`, `llm_calls`, `safety_events` |
 
 ### Mobile app
 
-- **Routing:** `expo-router` with file-based routes in `apps/mobile/src/app`. Tabs are Home, Story, Ask, Notifications and Profile; onboarding, goal detail, paywall, bookmarks and settings are stack screens.
+- **Routing:** `expo-router` with file-based routes in `apps/mobile/src/app`. Tabs are Home, Story, Ask, Circles, Notifications and Profile. Onboarding, goal detail, moment log, circle feed, post and composer, family playbook, edit family, sign in, forgot password, paywall, bookmarks and settings are stack screens.
 - **Notifications:** `lib/notificationPlan.ts` is a pure planner that picks at most one notification per day for the next 3 days (priority: check-in, log reminder, daily idea). `lib/notifications.ts` holds the on-device prefs and check-ins, asks for permission in context, schedules with `expo-notifications` on every app open, and routes taps to the right screen. Nothing goes through a push server, so notification text never leaves the phone; if the app isn't opened for ~3 days, notifications pause. `lib/expoNotifications.ts` imports only the parts of `expo-notifications` the app uses, because importing the package root crashes Android Expo Go.
 - **Data:** `lib/api.ts` wraps `fetch` for JSON calls and `expo/fetch` for the chat SSE stream. Server state is cached with react-query, and the JWT lives in secure storage (`lib/session.tsx`).
 - **Chat rendering:** `ChatBubble` renders the small slice of Markdown models produce (bold, bullet and numbered lists, headings) with the app's own fonts, and turns `[n]` markers into citation tags that match the "Based on" source list. Copy/share strips the Markdown.
@@ -580,160 +750,6 @@ Three reports from different parents hide an item until a moderator decides; onc
 
 Set `LLM_PROVIDER` to force one. Each row in `llm_calls` records the provider, model, purpose, tokens, latency and cost, and `GET /v1/admin/costs` summarizes them.
 
-## Getting started
-
-Runs on Windows, macOS and Linux. No API keys are needed: without one, the app uses a built-in mock LLM, so every screen works offline.
-
-**Quick start** (if you already have Node 22.9+ and Docker running):
-
-```bash
-git clone https://github.com/kanugurajesh/parentpal.git
-cd parentpal
-npm install
-cp .env.example .env
-npm run dev
-```
-
-Then press **`w`** in the terminal to open the app in your browser. The steps below explain each part, and [Troubleshooting](#troubleshooting) covers the usual problems.
-
-### 1. Install the prerequisites
-
-| Tool | Version | Check with | Notes |
-|---|---|---|---|
-| [Node.js](https://nodejs.org) | **22.9 or newer** (tested on 24) | `node -v` | The scripts use `--env-file-if-exists`, which older Node versions don't have. |
-| npm | comes with Node | `npm -v` | The repo is an npm workspace; use npm, not yarn or pnpm. |
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Compose v2.17+ | `docker compose version` | Runs Postgres. **Start Docker before running any script.** |
-| Git | any | `git --version` | |
-
-Optional:
-
-- **To see the app on a phone:** the [Expo Go](https://expo.dev/go) app. The project uses **Expo SDK 57**, so install the current Expo Go from the app store.
-- **For an emulator:** Android Studio (Android emulator) or Xcode (iOS simulator, macOS only).
-- **For real AI answers:** a free [Groq API key](https://console.groq.com/keys), or an OpenAI key.
-
-### 2. Clone and install
-
-```bash
-git clone https://github.com/kanugurajesh/parentpal.git
-cd parentpal
-npm install
-```
-
-`npm install` at the root installs the API, the mobile app and the shared package together. It takes a few minutes the first time.
-
-### 3. Create your `.env`
-
-```bash
-cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
-```
-
-The defaults work as they are. Things you may want to change:
-
-| Setting | When to change it |
-|---|---|
-| `JWT_SECRET` | Set any long random string. Required in production; fine as is locally. |
-| `GROQ_API_KEY` (or `OPENAI_API_KEY`) | Add one for real AI answers instead of the mock. |
-| `RESEND_API_KEY` | Only to send real password-reset emails. Without it, the code is printed in the API terminal. |
-
-All settings are listed under [Environment variables](#environment-variables).
-
-### 4. Run it
-
-```bash
-npm run dev
-```
-
-This one command:
-
-1. starts Postgres in Docker on port **5433** (it creates the main and test databases the first time),
-2. runs the database migrations,
-3. seeds the parenting content (14 goals, 26 wins),
-4. starts the API on **http://localhost:4000** and the Expo dev server on port **8081**, side by side.
-
-It's ready when the API has logged that it's listening on port 4000 and Expo shows its QR code. Then open the app:
-
-| Where | How |
-|---|---|
-| **Browser** | Press `w` in the terminal, or run `npm run dev:web` instead of `npm run dev`. |
-| **Phone (same Wi-Fi)** | Scan the QR code with Expo Go (Android) or the Camera app (iOS). See [Running on a phone](#running-on-a-phone). |
-| **Android emulator** | Start the emulator, then press `a`. |
-| **iOS simulator** (macOS) | Press `i`. |
-
-Check that the API is up: open http://localhost:4000/health. It shows which LLM is in use (`mock`, `groq` or `openai`).
-
-Stop everything with `Ctrl+C`. Postgres keeps running in the background; `npm run db:down` stops it.
-
-### 5. Try it out
-
-There are no demo logins: the app is guest-first, so every flow starts from a fresh profile.
-
-1. **Onboarding:** add a child (and optionally a second one), pick 1–2 goals, then close the paywall to use the free tier.
-2. **Story:** log three moments about the child. A pattern appears after the third.
-3. **Ask:** ask a question, e.g. "How do I handle tantrums at bedtime?". Answers cite their sources.
-4. **Goals:** open a goal, tap **I'll try this** on win 1, then record how it went.
-5. **Account:** Profile → **Create account**. To test **Forgot password**, sign out, tap *Forgot password?*, and copy the 6-digit code from the API terminal.
-6. **Two children:** Profile → **Edit** → add a child, then switch between them on Home.
-7. **Unlock everything:** choose any plan on the paywall. It's a fake subscription; no payment is taken.
-
-The Circles review queue and LLM costs are on admin routes that need the `x-admin-key` header (default `dev-admin-key`). See [API](#api).
-
-### Running on a phone
-
-A phone can't use `localhost`, because on the phone that means the phone itself.
-
-- **Same Wi-Fi (the usual case):** nothing to configure. In development the app reaches the API through the same computer the Expo dev server runs on. If the app says it can't reach the server:
-  - allow Node.js through your firewall on **private networks** (Windows asks the first time), and
-  - if it still fails, create `apps/mobile/.env.local` containing `EXPO_PUBLIC_API_URL=http://<your computer's LAN IP>:4000`, then restart `npm run dev`. Expo only reads env files from `apps/mobile`, not the root `.env`.
-- **Different networks, or Wi-Fi that blocks devices from seeing each other:** use the ngrok tunnel. Put `NGROK_AUTHTOKEN` and a free static `NGROK_DOMAIN` from [ngrok](https://dashboard.ngrok.com/domains) in the root `.env`, set `EXPO_PUBLIC_API_URL=https://<NGROK_DOMAIN>` in `apps/mobile/.env.local`, then run `npm run dev:tunnel`.
-- **Notifications** don't work in Expo Go on Android (Expo's limit, not this app's). Use iOS, or an Android development build (`npm run -w @parentpal/mobile android`), to test them.
-
-### Running the tests
-
-```bash
-npm test             # starts Postgres if needed, then runs the 111 API tests
-npm run typecheck    # type-checks every workspace
-npm run eval         # AI eval suite (mock LLM); add -- --judge with a real key
-```
-
-Tests use their own database (`parentpal_test`) and always use the mock LLM, so they're free, offline and never touch your dev data.
-
-### Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| `npm run dev` fails at `docker compose` | Docker isn't running. Start Docker Desktop, wait until it says it's running, and try again. |
-| `bad option: --env-file-if-exists` | Node is older than 22.9. Upgrade Node and run `npm install` again. |
-| `port is already allocated` (5433), or `EADDRINUSE` (4000) | Another Postgres or an earlier run is using the port. Stop it, or change the port in `docker-compose.yml` and `DATABASE_URL` / `TEST_DATABASE_URL`, or `PORT`. |
-| Expo says port 8081 is in use | An earlier Expo is still running. Close it, or press `y` to use another port. |
-| The health check shows `openai` or `groq` though you set no key | A key is set in your shell's environment, and shell variables win over `.env`. Unset it, or set `LLM_PROVIDER=mock` in `.env`. |
-| Phone shows "Can't reach ParentPal's server" | See [Running on a phone](#running-on-a-phone): firewall first, then `EXPO_PUBLIC_API_URL`. |
-| Expo Go says the project needs a newer SDK | Update Expo Go from the app store (the project uses SDK 57). |
-| `ERR_NGROK_334` | An earlier tunnel is still running. Stop it, then run `npm run dev:tunnel` again. |
-| `relation ... does not exist` | Migrations didn't run. Run `npm run setup`. |
-| Tests fail with `database "parentpal_test" does not exist` | The test database is only created with a fresh Docker volume. Run `docker compose exec db createdb -U parentpal parentpal_test`, or reset the database (below). |
-| You want a clean database | `docker compose down -v` deletes all local data, then `npm run setup` recreates it. |
-
-### Environment variables
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `4000` | API port |
-| `DATABASE_URL` / `TEST_DATABASE_URL` | local docker DBs on `5433` | Postgres connections (the test DB is created by `apps/api/db-init`) |
-| `JWT_SECRET` | dev placeholder | Signs auth tokens. **Change it.** The API won't start in production with the default. |
-| `ADMIN_KEY` | `dev-admin-key` | Required as the `x-admin-key` header on `/v1/admin/*` and `/v1/dev/*`. The API won't start in production with the default. |
-| `LLM_PROVIDER` | auto | `groq`, `openai` or `mock`. Auto-selects `groq`, then `openai`, by which key is present. |
-| `GROQ_API_KEY`, `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq config |
-| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | `gpt-4o-mini` | OpenAI or any OpenAI-compatible endpoint |
-| `LLM_REASONING_EFFORT` | empty | Sent as `reasoning_effort` (`low` recommended for gpt-oss) |
-| `LLM_THINKING_TOKEN_HEADROOM` | `0` | Extra output tokens per call for reasoning models (`512` in `.env.example`) |
-| `LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M` | `0.15`, `0.60` | USD per 1M tokens for cost logging. Check against current pricing. |
-| `DAILY_TIP_CRON` | `0 8 * * *` | Server job that fills the inbox with each user's tip for the day (server local time). Phones also fetch upcoming tips themselves. |
-| `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | API base URL for the app (set in `apps/mobile/.env.local`) |
-| `NGROK_AUTHTOKEN`, `NGROK_DOMAIN` | empty | Used by `npm run dev:tunnel` |
-| `RESEND_API_KEY`, `EMAIL_FROM` | empty, `ParentPal <onboarding@resend.dev>` | Sends password-reset codes through [Resend](https://resend.com). Empty: in development the code is printed in the API log; in production nothing is sent and a warning is logged. |
-| `RATE_LIMITS` | `on` | `off` disables rate limits (local load testing only). Tests run without them except `rate-limit.test.ts`. |
-| `TRUST_PROXY` | auto | Trust `X-Forwarded-For` so IP limits see the phone, not the proxy. Auto: on when `NGROK_DOMAIN` is set. Only turn it on behind a proxy you control. |
-
 ## Scripts
 
 Run from the repo root:
@@ -774,7 +790,7 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 
 ## Testing and evals
 
-**Tests** (`apps/api/test`) cover guest/register/login auth, goal locking, moment tagging and pattern creation, the chat SSE stream, the safety bypass, feedback and bookmarks, cascade delete, and the daily job being safe to re-run. They always use the mock LLM.
+**Tests** (`apps/api/test`, 111 in total) cover guest/register/login auth and password reset, profile editing and two children, goal locking, moment tagging and pattern creation, win tries and progress, the chat SSE stream, the safety bypass, feedback and bookmarks, Circles (anonymity, moderation, reports, blocks, guide replies), the Family Playbook (links, entitlement, caregiver notes), rate limits, cascade delete, and the daily job being safe to re-run. They always use the mock LLM.
 
 **Evals** (`evals/cases.json`, 25 cases) measure retrieval hit rate, grounding, clarify behavior and safety-trigger precision/recall. Each run writes a JSON report to `evals/results/`. Latest mock-mode run:
 
@@ -790,7 +806,7 @@ Two caveats on these numbers. Grounding scores are close to meaningless in mock 
 
 ## Content
 
-Seven goals exist. Three have full content: **handling tantrums**, **fixing sleep issues** and **tackling picky eating**. The other four (focus, keeping busy, screen time, potty training) are shown as "Coming soon". Every win cites sources from `content/sources.json` (AAP/HealthyChildren.org, CDC, NHS, AASM), with access dates. The advisors shown in the app are fictional placeholders.
+There are 14 goals with 26 wins in `content/goals/`. Three have the full set of 5 wins: **handling tantrums**, **fixing sleep issues** and **tackling picky eating**. The other 11 (anger, bedwetting, focus, keeping busy, lying, potty training, school anxiety, screen time, separation anxiety, sibling rivalry, speech and language) have one starter win each. A goal without content would show as "Guide coming soon". Every win cites sources from `content/sources.json` (AAP/HealthyChildren.org, CDC, NHS, AASM), with access dates. The advisors shown in the app are fictional placeholders.
 
 ## Privacy by design
 
