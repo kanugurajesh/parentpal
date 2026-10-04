@@ -582,33 +582,136 @@ Set `LLM_PROVIDER` to force one. Each row in `llm_calls` records the provider, m
 
 ## Getting started
 
-### Prerequisites
+Runs on Windows, macOS and Linux. No API keys are needed: without one, the app uses a built-in mock LLM, so every screen works offline.
 
-- Node.js 22+ (scripts use `--env-file-if-exists`)
-- Docker (for Postgres)
-- Optional: a [Groq API key](https://console.groq.com/keys) (or an OpenAI key). Without one the app uses the mock LLM.
-- Optional: Expo Go on a phone, or an Android/iOS emulator
-
-### Setup
+**Quick start** (if you already have Node 22.9+ and Docker running):
 
 ```bash
+git clone https://github.com/kanugurajesh/parentpal.git
+cd parentpal
 npm install
-cp .env.example .env      # set JWT_SECRET; add GROQ_API_KEY for real answers
-npm run dev               # Postgres + migrate + seed + API + Expo
+cp .env.example .env
+npm run dev
 ```
 
-`npm run dev` starts Postgres in Docker (on port **5433**), runs migrations, seeds content, then runs the API on `http://localhost:4000` and the Expo dev server side by side.
+Then press **`w`** in the terminal to open the app in your browser. The steps below explain each part, and [Troubleshooting](#troubleshooting) covers the usual problems.
 
-For the browser only:
+### 1. Install the prerequisites
+
+| Tool | Version | Check with | Notes |
+|---|---|---|---|
+| [Node.js](https://nodejs.org) | **22.9 or newer** (tested on 24) | `node -v` | The scripts use `--env-file-if-exists`, which older Node versions don't have. |
+| npm | comes with Node | `npm -v` | The repo is an npm workspace; use npm, not yarn or pnpm. |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Compose v2.17+ | `docker compose version` | Runs Postgres. **Start Docker before running any script.** |
+| Git | any | `git --version` | |
+
+Optional:
+
+- **To see the app on a phone:** the [Expo Go](https://expo.dev/go) app. The project uses **Expo SDK 57**, so install the current Expo Go from the app store.
+- **For an emulator:** Android Studio (Android emulator) or Xcode (iOS simulator, macOS only).
+- **For real AI answers:** a free [Groq API key](https://console.groq.com/keys), or an OpenAI key.
+
+### 2. Clone and install
 
 ```bash
-npm run dev:web
+git clone https://github.com/kanugurajesh/parentpal.git
+cd parentpal
+npm install
 ```
 
-To test on a physical phone, the app needs a URL for the API that the phone can reach, because `localhost` on the phone is the phone itself. Expo only reads env files from `apps/mobile`, so set it in `apps/mobile/.env.local`:
+`npm install` at the root installs the API, the mobile app and the shared package together. It takes a few minutes the first time.
 
-- **Same Wi-Fi:** `EXPO_PUBLIC_API_URL=http://<your LAN IP>:4000` and run `npm run dev`.
-- **Any network (ngrok):** put `NGROK_AUTHTOKEN` and a free static `NGROK_DOMAIN` in the root `.env`, set `EXPO_PUBLIC_API_URL=https://<NGROK_DOMAIN>`, then run `npm run dev:tunnel`. It starts the API, an ngrok tunnel to it, and Expo in `--tunnel` mode. If ngrok reports `ERR_NGROK_334` or Expo says port 8081 is busy, an earlier run is still alive; stop it first.
+### 3. Create your `.env`
+
+```bash
+cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
+```
+
+The defaults work as they are. Things you may want to change:
+
+| Setting | When to change it |
+|---|---|
+| `JWT_SECRET` | Set any long random string. Required in production; fine as is locally. |
+| `GROQ_API_KEY` (or `OPENAI_API_KEY`) | Add one for real AI answers instead of the mock. |
+| `RESEND_API_KEY` | Only to send real password-reset emails. Without it, the code is printed in the API terminal. |
+
+All settings are listed under [Environment variables](#environment-variables).
+
+### 4. Run it
+
+```bash
+npm run dev
+```
+
+This one command:
+
+1. starts Postgres in Docker on port **5433** (it creates the main and test databases the first time),
+2. runs the database migrations,
+3. seeds the parenting content (14 goals, 26 wins),
+4. starts the API on **http://localhost:4000** and the Expo dev server on port **8081**, side by side.
+
+It's ready when the API has logged that it's listening on port 4000 and Expo shows its QR code. Then open the app:
+
+| Where | How |
+|---|---|
+| **Browser** | Press `w` in the terminal, or run `npm run dev:web` instead of `npm run dev`. |
+| **Phone (same Wi-Fi)** | Scan the QR code with Expo Go (Android) or the Camera app (iOS). See [Running on a phone](#running-on-a-phone). |
+| **Android emulator** | Start the emulator, then press `a`. |
+| **iOS simulator** (macOS) | Press `i`. |
+
+Check that the API is up: open http://localhost:4000/health. It shows which LLM is in use (`mock`, `groq` or `openai`).
+
+Stop everything with `Ctrl+C`. Postgres keeps running in the background; `npm run db:down` stops it.
+
+### 5. Try it out
+
+There are no demo logins: the app is guest-first, so every flow starts from a fresh profile.
+
+1. **Onboarding:** add a child (and optionally a second one), pick 1–2 goals, then close the paywall to use the free tier.
+2. **Story:** log three moments about the child. A pattern appears after the third.
+3. **Ask:** ask a question, e.g. "How do I handle tantrums at bedtime?". Answers cite their sources.
+4. **Goals:** open a goal, tap **I'll try this** on win 1, then record how it went.
+5. **Account:** Profile → **Create account**. To test **Forgot password**, sign out, tap *Forgot password?*, and copy the 6-digit code from the API terminal.
+6. **Two children:** Profile → **Edit** → add a child, then switch between them on Home.
+7. **Unlock everything:** choose any plan on the paywall. It's a fake subscription; no payment is taken.
+
+The Circles review queue and LLM costs are on admin routes that need the `x-admin-key` header (default `dev-admin-key`). See [API](#api).
+
+### Running on a phone
+
+A phone can't use `localhost`, because on the phone that means the phone itself.
+
+- **Same Wi-Fi (the usual case):** nothing to configure. In development the app reaches the API through the same computer the Expo dev server runs on. If the app says it can't reach the server:
+  - allow Node.js through your firewall on **private networks** (Windows asks the first time), and
+  - if it still fails, create `apps/mobile/.env.local` containing `EXPO_PUBLIC_API_URL=http://<your computer's LAN IP>:4000`, then restart `npm run dev`. Expo only reads env files from `apps/mobile`, not the root `.env`.
+- **Different networks, or Wi-Fi that blocks devices from seeing each other:** use the ngrok tunnel. Put `NGROK_AUTHTOKEN` and a free static `NGROK_DOMAIN` from [ngrok](https://dashboard.ngrok.com/domains) in the root `.env`, set `EXPO_PUBLIC_API_URL=https://<NGROK_DOMAIN>` in `apps/mobile/.env.local`, then run `npm run dev:tunnel`.
+- **Notifications** don't work in Expo Go on Android (Expo's limit, not this app's). Use iOS, or an Android development build (`npm run -w @parentpal/mobile android`), to test them.
+
+### Running the tests
+
+```bash
+npm test             # starts Postgres if needed, then runs the 111 API tests
+npm run typecheck    # type-checks every workspace
+npm run eval         # AI eval suite (mock LLM); add -- --judge with a real key
+```
+
+Tests use their own database (`parentpal_test`) and always use the mock LLM, so they're free, offline and never touch your dev data.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `npm run dev` fails at `docker compose` | Docker isn't running. Start Docker Desktop, wait until it says it's running, and try again. |
+| `bad option: --env-file-if-exists` | Node is older than 22.9. Upgrade Node and run `npm install` again. |
+| `port is already allocated` (5433), or `EADDRINUSE` (4000) | Another Postgres or an earlier run is using the port. Stop it, or change the port in `docker-compose.yml` and `DATABASE_URL` / `TEST_DATABASE_URL`, or `PORT`. |
+| Expo says port 8081 is in use | An earlier Expo is still running. Close it, or press `y` to use another port. |
+| The health check shows `openai` or `groq` though you set no key | A key is set in your shell's environment, and shell variables win over `.env`. Unset it, or set `LLM_PROVIDER=mock` in `.env`. |
+| Phone shows "Can't reach ParentPal's server" | See [Running on a phone](#running-on-a-phone): firewall first, then `EXPO_PUBLIC_API_URL`. |
+| Expo Go says the project needs a newer SDK | Update Expo Go from the app store (the project uses SDK 57). |
+| `ERR_NGROK_334` | An earlier tunnel is still running. Stop it, then run `npm run dev:tunnel` again. |
+| `relation ... does not exist` | Migrations didn't run. Run `npm run setup`. |
+| Tests fail with `database "parentpal_test" does not exist` | The test database is only created with a fresh Docker volume. Run `docker compose exec db createdb -U parentpal parentpal_test`, or reset the database (below). |
+| You want a clean database | `docker compose down -v` deletes all local data, then `npm run setup` recreates it. |
 
 ### Environment variables
 
