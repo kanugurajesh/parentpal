@@ -63,7 +63,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (switching) await clearScheduledNotifications().catch(() => {});
       await storage.set(TOKEN_KEY, auth.token);
       setToken(auth.token);
-      qc.clear();
+      // Not qc.clear(): that drops the cache but screens that stay mounted (the tabs under the sign-in
+      // modal) keep their old data and never refetch, e.g. Circles kept "You're reading as a guest".
+      // resetQueries wipes every query and refetches the active ones with the new token.
+      void qc.resetQueries();
       setHasSession(true);
       // The sync hook only re-runs when the session starts, so reschedule for the new profile here.
       if (switching) void syncNotifications();

@@ -15,20 +15,31 @@ export default function Profile() {
   const user = me?.user;
   const sub = me?.subscription;
 
+  // Guests only: there's nothing to sign back in with, so leaving loses the profile for good.
   async function startNew() {
-    const guest = user?.isGuest;
     const ok = await confirm({
       title: "Start a new profile?",
-      message: guest
-        ? "This phone will forget the current guest profile. Without an account you won't be able to get back to it."
-        : "You'll be signed out. You can sign back in with your email anytime.",
+      message:
+        "This phone will forget the current guest profile. Without an account you won't be able to get back to it. Create a free account first if you want to keep it.",
       confirmLabel: "Start new profile",
-      // A guest profile is lost for good; a signed-in one can be recovered.
-      tone: guest ? "danger" : "default",
+      tone: "danger",
       icon: "person",
     });
     if (!ok) return;
     await signOut();
+    router.replace("/onboarding");
+  }
+
+  async function logOut() {
+    const ok = await confirm({
+      title: "Sign out?",
+      message: `You can sign back in with ${user?.email ?? "your email"} anytime. Your family, moments and goals stay saved.`,
+      confirmLabel: "Sign out",
+      icon: "logout",
+    });
+    if (!ok) return;
+    await signOut();
+    // The welcome screen, which offers "Sign in" alongside starting fresh.
     router.replace("/onboarding");
   }
 
@@ -84,10 +95,18 @@ export default function Profile() {
           <ListRow icon="home" label="Settings" detail="Notifications, privacy and account" onPress={() => router.push("/settings")} />
         </View>
 
-        <View style={{ backgroundColor: color.card, borderRadius: radius.card, overflow: "hidden", borderWidth: 1.5, borderColor: color.line }}>
-          {user?.isGuest ? <ListRow icon="person" label="Sign in" detail="Use an existing account on this phone" onPress={() => router.push({ pathname: "/sign-in", params: { mode: "login" } })} /> : null}
-          <ListRow icon="plus" label="Start new profile" onPress={startNew} />
-        </View>
+        {user ? (
+          <View style={{ backgroundColor: color.card, borderRadius: radius.card, overflow: "hidden", borderWidth: 1.5, borderColor: color.line }}>
+            {user.isGuest ? (
+              <>
+                <ListRow icon="person" label="Sign in" detail="Use an existing account on this phone" onPress={() => router.push({ pathname: "/sign-in", params: { mode: "login" } })} />
+                <ListRow icon="plus" label="Start new profile" onPress={startNew} />
+              </>
+            ) : (
+              <ListRow icon="logout" label="Sign out" detail={user.email ?? undefined} onPress={logOut} />
+            )}
+          </View>
+        ) : null}
       </View>
     </Screen>
   );

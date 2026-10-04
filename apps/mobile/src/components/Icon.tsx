@@ -25,7 +25,8 @@ export type IconName =
   | "trash"
   | "people"
   | "more"
-  | "heart";
+  | "heart"
+  | "logout";
 
 /** Hand-drawn, 24px grid, 1.8 stroke, rounded caps: one consistent icon voice for the app. */
 export function Icon({ name, size = 24, color = c.ink, filled = false }: { name: IconName; size?: number; color?: string; filled?: boolean }) {
@@ -67,6 +68,15 @@ export function Icon({ name, size = 24, color = c.ink, filled = false }: { name:
       break;
     case "plus":
       body = <Path {...s} d="M12 5v14M5 12h14" />;
+      break;
+    case "logout":
+      // An open door frame with an arrow stepping out.
+      body = (
+        <>
+          <Path {...s} d="M13.5 4.5H7A2 2 0 0 0 5 6.5v11a2 2 0 0 0 2 2h6.5" />
+          <Path {...s} d="M11 12h9M16.8 8.5 20.2 12l-3.4 3.5" />
+        </>
+      );
       break;
     case "lock":
       body = (
