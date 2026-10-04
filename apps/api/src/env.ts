@@ -23,6 +23,13 @@ const EnvSchema = z.object({
   /** Where Family Playbook links point. Falls back to the ngrok domain, then localhost. */
   PUBLIC_BASE_URL: z.string().default(""),
   NGROK_DOMAIN: z.string().default(""),
+  /** Password-reset emails go through Resend when set. Empty: dev logs the code to the server console. */
+  RESEND_API_KEY: z.string().default(""),
+  EMAIL_FROM: z.string().default("ParentPal <onboarding@resend.dev>"),
+  /** Off only for local load testing. Tests build the app without limits unless a test opts in. */
+  RATE_LIMITS: z.enum(["on", "off"]).default("on"),
+  /** Trust X-Forwarded-For. Empty: on when NGROK_DOMAIN is set. Only turn on behind a proxy you control. */
+  TRUST_PROXY: z.enum(["", "true", "false"]).default(""),
 });
 
 const parsed = EnvSchema.parse(process.env);
@@ -41,6 +48,7 @@ export const env = {
   ...parsed,
   isTest,
   databaseUrl: isTest ? parsed.TEST_DATABASE_URL : parsed.DATABASE_URL,
+  trustProxy: parsed.TRUST_PROXY ? parsed.TRUST_PROXY === "true" : !!parsed.NGROK_DOMAIN,
   publicBaseUrl: (
     parsed.PUBLIC_BASE_URL ||
     (parsed.NGROK_DOMAIN ? `https://${parsed.NGROK_DOMAIN.replace(/^https?:\/\//, "")}` : `http://localhost:${parsed.PORT}`)

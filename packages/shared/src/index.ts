@@ -66,11 +66,27 @@ export type User = z.infer<typeof User>;
 export const AuthResponse = z.object({ token: z.string(), user: User });
 export type AuthResponse = z.infer<typeof AuthResponse>;
 
-export const Credentials = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8, "Use at least 8 characters").max(200),
-});
+const Email = z.string().trim().toLowerCase().email();
+const Password = z.string().min(8, "Use at least 8 characters").max(200);
+
+export const Credentials = z.object({ email: Email, password: Password });
 export type Credentials = z.infer<typeof Credentials>;
+
+/** Step 1 of "forgot password": always answers ok, so it can't be used to find out who has an account. */
+export const ForgotPassword = z.object({ email: Email });
+export type ForgotPassword = z.infer<typeof ForgotPassword>;
+
+/** Step 2: the 6-digit code from the email plus the new password. Signs in and signs out other devices. */
+export const ResetPassword = z.object({
+  email: Email,
+  code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from the email"),
+  password: Password,
+});
+export type ResetPassword = z.infer<typeof ResetPassword>;
+
+/** Codes expire after this many minutes and allow this many wrong guesses. */
+export const RESET_CODE_MINUTES = 15;
+export const RESET_CODE_MAX_ATTEMPTS = 5;
 
 export const UpdateMe = z.object({
   parentRole: ParentRole.optional(),

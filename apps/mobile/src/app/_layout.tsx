@@ -66,6 +66,7 @@ function Root() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="paywall" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
+        <Stack.Screen name="forgot-password" options={{ presentation: "modal" }} />
         <Stack.Screen name="moment/new" options={{ presentation: "modal" }} />
         <Stack.Screen name="post/new" options={{ presentation: "modal" }} />
       </Stack>

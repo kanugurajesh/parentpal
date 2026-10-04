@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Linking, View } from "react-native";
 import { confirm } from "@/lib/confirm";
 import { formatAge } from "@parentpal/shared";
-import { ListRow, Screen, T } from "@/components/ui";
+import { Button, ListRow, Screen, T } from "@/components/ui";
 import { goalTitle } from "@/lib/goals";
 import { useSession } from "@/lib/session";
 import { color, radius, space } from "@/theme/tokens";
@@ -52,7 +52,12 @@ export default function Profile() {
 
         {/* Family */}
         <View style={{ backgroundColor: color.card, borderRadius: radius.hero, padding: space.xl, gap: space.md, borderWidth: 1.5, borderColor: color.line }}>
-          <T variant="h3">{user?.firstName ? `${user.firstName}'s family` : "Your family"}</T>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md }}>
+            <T variant="h3" style={{ flex: 1 }}>
+              {user?.firstName ? `${user.firstName}'s family` : "Your family"}
+            </T>
+            {me ? <Button label="Edit" kind="ghost" icon="person" onPress={() => router.push("/edit-family")} accessibilityHint="Change names, roles and birth dates" /> : null}
+          </View>
           <T variant="small" color={color.inkSoft}>
             {user?.parentRole ? `${user.parentRole === "mother" ? "Mother" : "Father"}` : "Parent"}
             {user?.isGuest ? ", guest profile" : user?.email ? `, ${user.email}` : ""}

@@ -1,4 +1,4 @@
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -25,8 +25,9 @@ export async function verifyPassword(password: string, stored: string) {
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    payload: { sub: string };
-    user: { sub: string };
+    /** sv: users.session_version when the token was issued. Tokens from before it existed have none (= 0). */
+    payload: { sub: string; sv?: number };
+    user: { sub: string; sv?: number };
   }
 }
 
@@ -36,16 +37,28 @@ declare module "fastify" {
   }
 }
 
-/** preHandler: valid JWT *and* the user still exists (deleted accounts are locked out immediately). */
+/**
+ * preHandler: valid JWT *and* the user still exists (deleted accounts are locked out immediately)
+ * *and* the token is from the current session version (a password reset signs out other devices).
+ */
 export async function requireUser(req: FastifyRequest) {
   try {
     await req.jwtVerify();
   } catch {
     throw new HttpError(401, "Sign in again to continue.");
   }
-  const [u] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, req.user.sub));
+  const [u] = await db
+    .select({ id: schema.users.id, sessionVersion: schema.users.sessionVersion })
+    .from(schema.users)
+    .where(eq(schema.users.id, req.user.sub));
   if (!u) throw new HttpError(401, "This profile no longer exists. Start a new profile to continue.");
+  if ((req.user.sv ?? 0) !== u.sessionVersion) throw new HttpError(401, "Your password was changed. Sign in again to continue.");
   req.userId = u.id;
+}
+
+/** 6-digit codes for "forgot password", zero-padded so every code is the same length. */
+export function newResetCode() {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
 export async function requireAdmin(req: FastifyRequest, _reply: FastifyReply) {

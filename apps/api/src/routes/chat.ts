@@ -7,6 +7,7 @@ import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
 import { clearChat, listMessages, runChat, startersFor, toChatMessages, TOPICS } from "../services/chat";
 import { loadFamilyContext } from "../services/context";
+import { llmLimit } from "../lib/rateLimit";
 
 const MsgParams = z.object({ id: z.string().uuid() });
 
@@ -45,7 +46,7 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
    * Server-Sent Events. Each line is `data: <ChatStreamEvent JSON>\n\n`.
    * Sequence: user → meta → delta* → done (or error).
    */
-  app.post("/chat/messages", { schema: { body: SendMessage } }, async (req, reply) => {
+  app.post("/chat/messages", { config: llmLimit.chat, schema: { body: SendMessage } }, async (req, reply) => {
     reply.hijack();
     const raw = reply.raw;
     raw.writeHead(200, {

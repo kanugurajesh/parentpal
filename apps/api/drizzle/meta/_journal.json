@@ -43,6 +43,13 @@
       "when": 1791086799305,
       "tag": "0005_win_tries",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791099047515,
+      "tag": "0006_password_resets",
+      "breakpoints": true
     }
   ]
 }

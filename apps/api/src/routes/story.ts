@@ -7,6 +7,7 @@ import { requireUser } from "../lib/auth";
 import { HttpError, notFound } from "../lib/errors";
 import { toMoment, toPattern } from "../lib/serialize";
 import { createMoment, generatePattern } from "../services/story";
+import { llmLimit } from "../lib/rateLimit";
 
 async function ownedChild(userId: string, childId: string) {
   const [c] = await db
@@ -42,7 +43,7 @@ export const storyRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  app.post("/moments", { schema: { body: CreateMoment, response: { 200: CreateMomentResponse } } }, async (req) => {
+  app.post("/moments", { config: llmLimit.moment, schema: { body: CreateMoment, response: { 200: CreateMomentResponse } } }, async (req) => {
     const child = await ownedChild(req.userId, req.body.childId);
     return createMoment(req.userId, child, req.body.text);
   });
@@ -62,7 +63,7 @@ export const storyRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     "/patterns/generate",
-    { schema: { body: z.object({ childId: z.string().uuid() }), response: { 200: Pattern } } },
+    { config: llmLimit.pattern, schema: { body: z.object({ childId: z.string().uuid() }), response: { 200: Pattern } } },
     async (req) => {
       await ownedChild(req.userId, req.body.childId);
       const p = await generatePattern(req.userId, req.body.childId);

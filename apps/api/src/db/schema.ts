@@ -54,6 +54,17 @@ export const users = pgTable("users", {
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   /** Set once the parent picks Family Playbook wins; until then the playbook shares win 1 of each goal. */
   playbookChosenAt: timestamp("playbook_chosen_at", { withTimezone: true }),
+  /** In every JWT; bumping it (password reset) signs out every other device. */
+  sessionVersion: integer("session_version").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+/** "Forgot password" codes: 6 digits, stored hashed, short-lived, few guesses. One live code per user. */
+export const passwordResets = pgTable("password_resets", {
+  userId: userRef().primaryKey(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  attempts: smallint("attempts").notNull().default(0),
   createdAt: createdAt(),
 });
 

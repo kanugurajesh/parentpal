@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { HttpError } from "../lib/errors";
 import { caregiverLog, openPublicPlaybook, type PublicPlaybook } from "../services/playbook";
+import { llmLimit } from "../lib/rateLimit";
 
 /**
  * The page a grandparent, nanny or teacher opens from a shared link: no app, no login.
@@ -157,6 +158,7 @@ export const publicPlaybookRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     "/p/:token/log",
     {
+      config: llmLimit.caregiver,
       schema: {
         params: Token,
         body: z.object({ quick: z.enum(["worked", "tough"]).optional(), text: z.string().max(1000).optional(), winId: z.string().max(100).optional() }),

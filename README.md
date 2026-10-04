@@ -20,7 +20,7 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Progress** | Every **I'll try this** is saved as a try. The parent taps how it went (Helped / A bit / Not yet) on the goal screen, or from the next-morning check-in. Each win shows "You tried this 4× · helped 3" and a next step ("This is working, keep going" or "Not helping yet. Try win 2?"). Goals show recent outcomes as dots and, after a week, week 1 against this week. Caregivers' "It worked / It was tough" counts too. See [Progress tracker](#6-progress-tracker-is-it-working). |
 | **Circles** | Anonymous groups by goal, with posts tagged by the child's age band. Each parent gets a different nickname in each circle. Three post types: question, **what worked** (tied to a win, with an outcome) and sharing. Questions get a cited "ParentPal guide" reply straight away. "What worked" reports add up to a "Parents like you: 5 of 7 said it helped" line on the win. Every post and reply is moderated before anyone sees it. See [How Circles work](#how-circles-work). |
 | **Family playbook** | Share the wins you're trying, with the exact words to say, with grandparents, the other parent, a nanny or a teacher. Each person gets a private link that needs no app or login. They can send back "It worked" or "It was tough" plus a note, which lands in the child's Story as "Logged by Nani" and counts towards patterns. See [Feature brief: Family Playbook](#feature-brief-family-playbook). |
-| **Profile** | Family profile, sign in / create account (upgrades the guest account), bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
+| **Profile** | Family profile you can edit (names, role, birth dates, add or remove a child), sign in / create account (upgrades the guest account), forgot password (emailed 6-digit code), sign out, bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
 | **Safety** | A rule-based red-flag check runs on every chat message and moment *before* any LLM call. Covered: medical emergencies, abuse, self-harm, developmental concerns. On a match the app skips the advice and shows fixed safety guidance instead. |
 
 ## What's new: features built on top of the original idea
@@ -596,6 +596,9 @@ To test on a physical phone, the app needs a URL for the API that the phone can 
 | `DAILY_TIP_CRON` | `0 8 * * *` | Server job that fills the inbox with each user's tip for the day (server local time). Phones also fetch upcoming tips themselves. |
 | `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | API base URL for the app (set in `apps/mobile/.env.local`) |
 | `NGROK_AUTHTOKEN`, `NGROK_DOMAIN` | empty | Used by `npm run dev:tunnel` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | empty, `ParentPal <onboarding@resend.dev>` | Sends password-reset codes through [Resend](https://resend.com). Empty: in development the code is printed in the API log; in production nothing is sent and a warning is logged. |
+| `RATE_LIMITS` | `on` | `off` disables rate limits (local load testing only). Tests run without them except `rate-limit.test.ts`. |
+| `TRUST_PROXY` | auto | Trust `X-Forwarded-For` so IP limits see the phone, not the proxy. Auto: on when `NGROK_DOMAIN` is set. Only turn it on behind a proxy you control. |
 
 ## Scripts
 
@@ -618,7 +621,7 @@ Run from the repo root:
 
 All routes live under `/v1`, take and return JSON validated with zod, and need a Bearer JWT unless noted. The main groups:
 
-- **Auth:** `POST /auth/guest`, `/auth/register` (upgrades the guest), `/auth/login`
+- **Auth:** `POST /auth/guest`, `/auth/register` (upgrades the guest), `/auth/login`, `/auth/forgot` (emails a 6-digit code; always answers `{ ok: true }`), `/auth/reset` (code + new password; signs in and signs out other devices)
 - **Profile:** `GET|PATCH|DELETE /me` (DELETE hard-deletes everything through cascades), `PUT /me/goals`, `POST|PATCH|DELETE /children[/:id]`
 - **Goals:** `GET /goals`, `GET /goals/:slug` (locked wins return only their title), `GET /advisors`, `POST|DELETE /subscription` (fake)
 - **Story:** `GET|POST /moments`, `DELETE /moments/:id`, `GET /patterns`, `POST /patterns/generate`
@@ -630,6 +633,8 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`, `GET /admin/community/queue`, `POST /admin/community/:type/:id` (`approve` or `remove`)
 
 `GET /health` (no auth) reports which LLM provider is active.
+
+**Rate limits** (`apps/api/src/lib/rateLimit.ts`): requests count against the signed-in user, or the IP without a valid token. Every route has a ceiling of 300 a minute. Tighter limits: guest creation 20/hour, login 10 and reset 10 per 15 minutes, forgot-password 5/hour (all per IP), register 10/hour, chat messages 40/hour, moments 30/hour, pattern generation 10/hour and caregiver notes 20/hour per IP. Over the limit returns `429` with a `retry-after` header and a readable message.
 
 ## Testing and evals
 
@@ -669,8 +674,8 @@ Seven goals exist. Three have full content: **handling tantrums**, **fixing slee
 - **Notifications are on-device only, and not available in Android Expo Go.** Testing them on Android needs a development build. They pause if the app isn't opened for about 3 days, and there's no measurement yet of how often a check-in leads to a logged moment.
 - **Single instance.** The daily tip cron runs in-process.
 - **Circles moderation has no admin UI yet.** The review queue is a JSON endpoint. Before launch, someone has to own that queue every day. There are no push alerts for replies, only the inbox.
-- **No request rate limits** on guest creation, chat or moments, so a script could run up LLM costs. Circles has its own daily limits.
-- One running conversation per user. No password reset or social sign-in.
+- **Rate limits are in memory,** so they reset when the API restarts and aren't shared between instances. More than one instance needs the plugin's Redis store.
+- One running conversation per user. No social sign-in, and no way to change email or password from Settings (password reset works). Reset emails need a Resend key; without one, codes only appear in the API log.
 
 ## More docs
 

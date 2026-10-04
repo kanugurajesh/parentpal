@@ -82,6 +82,13 @@ export default function SignIn() {
           hint="At least 8 characters."
           onSubmitEditing={() => email && password.length >= 8 && !busy && submit()}
         />
+        {!creating ? (
+          <Button
+            label="Forgot password?"
+            kind="ghost"
+            onPress={() => router.push({ pathname: "/forgot-password", params: email.trim() ? { email: email.trim() } : {} })}
+          />
+        ) : null}
         {!creating && canCreate ? (
           <T variant="small" color={color.inkMuted}>
             Signing in to another account switches this phone to that profile. Your current guest profile stays on our server but you won't be able to reach it.

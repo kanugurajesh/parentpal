@@ -9,6 +9,7 @@ import {
 } from "fastify-type-provider-zod";
 import { env } from "./env";
 import { HttpError } from "./lib/errors";
+import { registerRateLimits } from "./lib/rateLimit";
 import { llm } from "./llm";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
@@ -22,9 +23,13 @@ import { progressRoutes } from "./routes/progress";
 import { publicPlaybookRoutes } from "./routes/publicPlaybook";
 import { storyRoutes } from "./routes/story";
 
-export async function buildApp() {
+/** Tests run without rate limits (every request comes from 127.0.0.1); a test can opt back in. */
+export async function buildApp(opts: { rateLimits?: boolean } = {}) {
   const app = Fastify({
     logger: env.isTest ? false : { level: "info", transport: undefined },
+    // Behind ngrok or a load balancer, req.ip must be the phone's address, not the proxy's,
+    // or every parent would share one IP-keyed rate limit.
+    trustProxy: env.trustProxy,
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
@@ -32,6 +37,7 @@ export async function buildApp() {
 
   await app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] });
   await app.register(jwt, { secret: env.JWT_SECRET });
+  if (opts.rateLimits ?? (!env.isTest && env.RATE_LIMITS === "on")) await registerRateLimits(app);
 
   app.setErrorHandler((err, _req, reply) => {
     if (hasZodFastifySchemaValidationErrors(err)) {

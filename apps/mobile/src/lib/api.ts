@@ -103,6 +103,8 @@ export const api = {
   guest: () => request<AuthResponse>("POST", "/auth/guest"),
   register: (email: string, password: string) => request<AuthResponse>("POST", "/auth/register", { email, password }),
   login: (email: string, password: string) => request<AuthResponse>("POST", "/auth/login", { email, password }),
+  forgotPassword: (email: string) => request<{ ok: true }>("POST", "/auth/forgot", { email }),
+  resetPassword: (email: string, code: string, password: string) => request<AuthResponse>("POST", "/auth/reset", { email, code, password }),
 
   me: () => request<Me>("GET", "/me"),
   updateMe: (body: UpdateMe) => request<User>("PATCH", "/me", body),
