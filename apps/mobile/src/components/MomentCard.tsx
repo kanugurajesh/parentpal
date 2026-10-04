@@ -33,6 +33,7 @@ export function MomentCard({ moment, highlight, footer }: { moment: Moment; high
       <View style={{ flex: 1, gap: space.sm }}>
         <T variant="tiny" color={color.inkMuted}>
           {momentDate(moment.createdAt)}
+          {moment.loggedBy ? ` · Logged by ${moment.loggedBy}` : ""}
         </T>
         <T>{moment.text}</T>
         {moment.tagStatus === "ok" ? (

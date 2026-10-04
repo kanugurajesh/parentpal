@@ -3,7 +3,8 @@ import { z } from "zod";
 import { formatAge, MOMENTS_PER_PATTERN, ageInMonths, type Pattern } from "@parentpal/shared";
 import { db, schema } from "../db/client";
 import { llm } from "../llm";
-import { toPattern } from "../lib/serialize";
+import { toMoment, toPattern } from "../lib/serialize";
+import { checkSafety } from "./safety";
 
 /* ------------------------------------------------------------------ */
 /* Moment tagging                                                      */
@@ -189,6 +190,42 @@ export async function generatePattern(userId: string, childId: string): Promise<
     .returning();
   await db.insert(schema.patternMoments).values(ids.map((momentId) => ({ patternId: p.id, momentId })));
   return toPattern(p, ids);
+}
+
+/**
+ * Saves a moment the same way for every surface (the parent's Story, a caregiver's playbook link).
+ * Safety first: a red-flag moment is saved (it's the family's journal) but never sent to the LLM.
+ */
+export async function createMoment(
+  userId: string,
+  child: typeof schema.children.$inferSelect,
+  text: string,
+  opts: { surface: "moment" | "caregiver"; caregiverId?: string; loggedBy?: string } = { surface: "moment" },
+) {
+  const by = { caregiverId: opts.caregiverId ?? null, loggedBy: opts.loggedBy ?? null };
+  const safety = checkSafety(text);
+  if (safety) {
+    await db.insert(schema.safetyEvents).values({ userId, surface: opts.surface, category: safety.category });
+    const [m] = await db.insert(schema.moments).values({ userId, childId: child.id, text, tagStatus: "safety", ...by }).returning();
+    return { moment: toMoment(m), safety, newPattern: null };
+  }
+
+  const tags = await tagMoment(userId, text, `${child.nickname}, ${formatAge(ageInMonths(child.birthMonth, child.birthYear))}`);
+  const [m] = await db
+    .insert(schema.moments)
+    .values({
+      userId,
+      childId: child.id,
+      text,
+      trigger: tags?.trigger ?? null,
+      behavior: tags?.behavior ?? null,
+      outcome: tags?.outcome ?? null,
+      tagStatus: tags ? "ok" : "failed",
+      ...by,
+    })
+    .returning();
+  const newPattern = await maybeGeneratePattern(userId, child.id);
+  return { moment: toMoment(m), safety: null, newPattern };
 }
 
 /** Auto-trigger: every MOMENTS_PER_PATTERN-th taggable moment for a child. */

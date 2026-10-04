@@ -68,5 +68,96 @@
     "publisher": "CDC",
     "url": "https://www.cdc.gov/act-early/index.html",
     "accessedOn": "2026-10-02"
+  },
+  {
+    "id": "nhs-play-ideas",
+    "title": "Baby and toddler play ideas",
+    "publisher": "NHS",
+    "url": "https://www.nhs.uk/baby/babys-development/play-and-learning/baby-and-toddler-play-ideas/",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-media-plan",
+    "title": "How to Make a Family Media Plan",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/Media/Pages/How-to-Make-a-Family-Media-Use-Plan.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-5cs-preschool",
+    "title": "Kids & Screen Time: 5 C's Questions for Toddlers & Preschoolers",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/Media/Pages/kids-and-screen-time-5-cs-questions-for-toddlers-and-preschoolers.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-play-preschool",
+    "title": "10 No-Cost, Screen-Free Activities to Play with Your Preschooler",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/power-of-play/Pages/10-no-cost-screen-free-activities-to-play-with-your-preschooler.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-potty-age",
+    "title": "The Right Age to Potty Train",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/ages-stages/toddler/toilet-training/Pages/the-right-age-to-toilet-train.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "nhs-potty",
+    "title": "Potty training your child",
+    "publisher": "NHS (Best Start in Life)",
+    "url": "https://www.nhs.uk/best-start-in-life/toddler/potty-training-your-child/",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-siblings",
+    "title": "Sibling Relationships: How to Help Your Kids Build Healthy Bonds",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/family-dynamics/Pages/sibling-synergy.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-anger",
+    "title": "Everybody Gets Mad: Helping Your Child Cope with Conflict",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/healthy-living/emotional-wellness/Pages/Everybody-Gets-Mad-Helping-Your-Child-Cope-with-Conflict.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-lying",
+    "title": "When Children Lie: What Parents Can Do",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/family-life/family-dynamics/communication-discipline/Pages/When-Children-Lie.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "nhs-bedwetting",
+    "title": "Bedwetting in children",
+    "publisher": "NHS",
+    "url": "https://www.nhs.uk/symptoms/bedwetting/",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-language-delay",
+    "title": "Language Delays in Toddlers: Information for Parents",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/ages-stages/toddler/Pages/language-delay.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-school-avoidance",
+    "title": "School Avoidance: Tips for Concerned Parents",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/health-issues/conditions/emotional-problems/Pages/School-Avoidance.aspx",
+    "accessedOn": "2026-10-04"
+  },
+  {
+    "id": "aap-separation",
+    "title": "How to Ease Your Child's Separation Anxiety",
+    "publisher": "American Academy of Pediatrics (HealthyChildren.org)",
+    "url": "https://www.healthychildren.org/English/ages-stages/toddler/Pages/Soothing-Your-Childs-Separation-Anxiety.aspx",
+    "accessedOn": "2026-10-04"
   }
 ]

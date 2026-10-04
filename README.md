@@ -18,8 +18,123 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Ask** | Streaming chat (SSE). Answers draw on the child's age, active goals and recent moments, plus retrieved content shown as citations. Vague questions get one clarifying question with tap-to-answer options. Replies can be rated 👍/👎, copied, shared and bookmarked. |
 | **Notifications** | On-device reminders that serve the try → log → pattern loop: a daily idea sent when it's usable (sleep ideas before bedtime), a "How did it go?" check-in the morning after tapping **I'll try this** on a win (opens the moment log, filled in), and one nudge after 3 days without a moment. At most one a day, never at night, each type switchable in Settings. Tips also collect in an in-app inbox. See [How notifications work](#how-notifications-work). |
 | **Circles** | Anonymous groups by goal, with posts tagged by the child's age band. Each parent gets a different nickname in each circle. Three post types: question, **what worked** (tied to a win, with an outcome) and sharing. Questions get a cited "ParentPal guide" reply straight away. "What worked" reports add up to a "Parents like you: 5 of 7 said it helped" line on the win. Every post and reply is moderated before anyone sees it. See [How Circles work](#how-circles-work). |
+| **Family playbook** | Share the wins you're trying, with the exact words to say, with grandparents, the other parent, a nanny or a teacher. Each person gets a private link that needs no app or login. They can send back "It worked" or "It was tough" plus a note, which lands in the child's Story as "Logged by Nani" and counts towards patterns. See [Feature brief: Family Playbook](#feature-brief-family-playbook). |
 | **Profile** | Family profile, sign in / create account (upgrades the guest account), bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
 | **Safety** | A rule-based red-flag check runs on every chat message and moment *before* any LLM call. Covered: medical emergencies, abuse, self-harm, developmental concerns. On a match the app skips the advice and shows fixed safety guidance instead. |
+
+## What's new: features built on top of the original idea
+
+The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Two larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
+
+| | Feature | One line |
+|---|---|---|
+| 1 | [**Circles**](#1-circles-anonymous-parent-community) | Anonymous groups of parents by goal and child's age, with instant expert-grounded answers and AI moderation. |
+| 2 | [**Family Playbook**](#2-family-playbook-share-the-plan-with-every-caregiver) | Share the plan and the exact words with grandparents, a nanny or a teacher on a no-app link; their notes flow into Story. |
+| 3 | [**Smaller improvements**](#3-smaller-improvements) | "Ask other parents" from chat, community stats on wins, reply notices in the inbox, coloured Story pebbles, and fixes. |
+| 4 | [**Quality work**](#4-quality-work-behind-these-features) | 26 new automated tests, live-model checks, and three new entries in the AI mistakes log. |
+
+### 1. Circles: anonymous parent community
+
+**What it is.** One circle per goal (Tantrums, Sleep, Picky eating, Screen time, Focus, Potty training, Keeping busy). Every post carries the child's age band (Under 1, 1 to 2, 2 to 3, 3 to 5, 5 and up), so parents read about children the same age as theirs.
+
+**Screens and what's on them**
+
+| Screen | What the parent sees and can do |
+|---|---|
+| **Circles tab** (new tab, between Ask and Notifications) | "Your circles" (from the goals they picked) first, then "More circles". Each circle shows its illustration and activity ("4 posts this week", or "Quiet this week. Start the conversation"). Guests see a "You're reading as a guest" card with **Create free account**. A "How Circles work" card lists the house rules. |
+| **Circle feed** (`circle/[goal]`) | A coloured header with **New post**. Age-band chips, with the parent's own band preselected and marked "(yours)", plus "All ages". Post cards show the author's nickname and label ("Gentle Robin · Mom of a 2-year-old"), time ago, the kind badge (Question / What worked / Sharing), the win and outcome for "what worked" posts, the text, reactions and reply count. **Load more** pages through older posts. If the chosen age is quiet, a **"From nearby ages"** section shows posts from the neighbouring bands. |
+| **Post** (`post/[id]`) | The full post. A pinned support card if it mentions a developmental worry. The **ParentPal guide** reply (green card, "From our expert-sourced guides, not another parent"), with numbered sources that open the goal. Then replies from parents, each with reactions and a **⋯** menu. A reply box at the bottom; guests see "Create a free account to reply". |
+| **⋯ menu** | On your own post or reply: **Delete** (with confirmation). On someone else's: a bottom sheet to **Report** (Unkind or shaming / Risky medical advice / Shares personal info / Spam or selling) or **Block this parent**. Guide replies can be reported but not blocked. |
+| **New post** (`post/new`, modal) | Circle picker (when opened from outside a circle), post type chips, and for "What worked": a win picker and outcome chips ("It helped" / "Helped a bit" / "Didn't help"). A text box with character counter (20–600), and a reminder: "Be kind. No names, numbers or links. Your child's name is replaced automatically. No medicine doses or diagnoses." **Post anonymously**. Afterwards it opens the post, or shows "Your post will appear once a moderator has checked it", or a support screen for a crisis. |
+
+**The rules**
+
+- **Anonymity:**
+  - A nickname like "Gentle Robin" is generated per parent per circle, keyed with a server secret, so one parent can't be linked across circles.
+  - The label shows only "Mom/Dad/Parent of a 2-year-old".
+  - The API never returns another user's id, email, name or child's nickname.
+  - The author's own children's nicknames are replaced with "my child" (capitalised at the start of a sentence).
+- **Who can do what:** guests can read everything. Posting, replying, reacting and reporting need a free account, which cuts spam. Blocking works for everyone.
+- **Moderation**, in order, for every post and reply:
+  1. Phone numbers, emails, links and @handles are rejected with a message naming what to remove.
+  2. Nicknames are replaced.
+  3. The safety rules run:
+     - Emergencies, self-harm and abuse are **not published**; the author sees helplines.
+     - A developmental worry is published with the "talk to your pediatrician" card pinned.
+  4. A rule holds anything mentioning a medicine or dose for review.
+  5. An LLM decides allow / review / block:
+     - **Review** (only the author sees it, marked "Pending review"): a diagnosis of someone else's child, or off-topic content.
+     - **Block** (rejected with a kind explanation): insults, shaming, selling, or "DM me".
+     - If the LLM is down, the item **waits for review** instead of going live.
+- **Reports:** 3 reports from different parents hide an item until a moderator decides. Once a moderator approves an item, reports alone can't hide it again.
+- **Blocking:** hides a parent's posts and replies in every circle, for the person who blocked them only.
+- **Limits:** 5 posts and 30 replies per parent per day.
+- **Guide reply:**
+  - Every question that goes live gets one reply from ParentPal's guides, built with the same prompt and citation checks as chat, with no family details.
+  - It only answers when the content library matches strongly and from **that circle's own goal**, and it is dropped if it can't cite a source.
+  - Crisis and developmental-worry posts never get one.
+- **"What worked" stats:** reports roll up per win (distinct parents, live posts only) into "Parents like you: 5 of 7 who tried this said it helped" on the win card, shown only once 3 or more parents have reported.
+- **Notifications:** when someone replies (or the guide answers), the author gets one inbox notice per post per day, e.g. "2 new replies to your post, plus a guide answer". Tapping it opens the post.
+- **Moderator tools:** `GET /v1/admin/community/queue` lists held and hidden items with the reasons and reports. `POST /v1/admin/community/:type/:id` with `approve` or `remove` decides.
+
+**Built with:** 6 new tables (`community_posts`, `community_replies`, `community_reactions`, `community_reports`, `community_blocks`, `community_notices`), migration `0002_community.sql`, `services/community.ts`, `services/moderation.ts`, `routes/community.ts`, and 4 new mobile screens plus `components/PostCard.tsx`.
+
+### 2. Family Playbook: share the plan with every caregiver
+
+**What it is.** The parent sends grandparents, the other parent, a nanny or a teacher a private link. It opens a simple page, with no app and no login, showing the wins the family is working on and the exact words to use. The caregiver can say how it went, and that note goes into the child's Story.
+
+**Screens and what's on them**
+
+| Screen | What you see and can do |
+|---|---|
+| **Home card** | "Get the whole family on the same page. Send Aarav's plan to Nani, Dad or the nanny. No app needed." Opens the Family playbook screen. |
+| **Profile row** | "Family playbook: share the plan with grandparents, nanny or teacher." |
+| **Win card** (goal screen) | A **Send to family** button that adds that win to the playbook and opens the Family playbook screen. |
+| **Family playbook screen** (`family`) | A short explanation of why consistency matters. **What you're sharing**: chips for every win the parent has unlocked, with the shared ones selected (up to 4), and each shared win's "Say this" script in an apricot callout. **Shared with**: one row per person with name, relationship, "Opened 2h ago" or "Not opened yet", and notes count, plus **share again** and **stop sharing** buttons. **Add someone**: "What does your child call them?" (e.g. Nani, Papa, Aunty Meena), relationship chips (Grandparent, Other parent, Nanny, Teacher, Other), and **Create link and share**, which opens the phone's share sheet with a ready-to-send message. |
+| **Caregiver page** (`/p/<link>`, in any phone browser) | "Hi Nani! Here's what we're trying with Aarav right now, shared by Priya (Mom)." One card per win: goal tag, title, **What to do**, **Say this** (large type), **What to expect**. **How did it go with Aarav?**: big **It worked** / **It was tough** buttons, an optional "What happened?" box, and **Send note**. Afterwards: "Thank you! Your note was sent", or for a red flag, helplines straight away. Styled with the app's colours, fonts and pebble logo. |
+| **Story** | Caregiver notes appear like any moment, marked "Logged by Nani", tagged by the AI (before / what happened / how it ended), and count towards patterns. |
+
+**The rules**
+
+- **Entitlement:** by default the playbook shares win 1 of each of the parent's goals. Only wins the parent has unlocked can be shared (win 1 free, the rest with a subscription), up to 4 at a time.
+- **Links:**
+  - Each link is a 32-byte random token and works until the parent stops sharing; it then shows "Link turned off".
+  - Up to 5 people per family.
+  - Notes already sent stay in Story after a link is turned off.
+- **Privacy:** the page shows only the child's nickname, the parent's first name and role, and the shared wins. Never chat, other moments, patterns or email.
+- **Page security:** the page is `noindex`, sends no referrer, isn't cached, uses a strict Content-Security-Policy, and HTML-escapes all text.
+- **No AI rewriting:** the expert-sourced win text is shown unchanged.
+- **One moment pipeline:** caregiver notes go through exactly the same pipeline as the parent's own (`createMoment()`): the safety check, then AI tagging, then the pattern check. A red flag is never sent to the AI and is logged as a safety event.
+- **Limits:** 20 notes per link per day.
+
+**Built with:** `caregivers` and `playbook_wins` tables plus `caregiver_id` and `logged_by` on `moments`, migration `0003_family_playbook.sql`, `services/playbook.ts`, `routes/playbook.ts` (parent API), `routes/publicPlaybook.ts` (caregiver page), `PUBLIC_BASE_URL` in `.env`, and the mobile `family.tsx` screen.
+
+### 3. Smaller improvements
+
+| Change | Where | What it does |
+|---|---|---|
+| **Ask other parents** | Under every chat answer (Ask tab) | Opens a new Circles question with the parent's question already filled in and the right circle picked. After a 👎 it reads "Not quite right? Ask other parents" and is highlighted. |
+| **Share how it went** | On every win card | Opens a "What worked" post with that win preselected, which feeds the "Parents like you" stats. |
+| **Parents like you** | On every win card | "5 of 7 who tried this said it helped", once 3 or more parents have reported. |
+| **Inbox reply notices** | Notifications tab | Circles replies appear next to daily ideas, and tapping one opens the post. |
+| **Coloured Story pebbles** | Story tab, "Log at least 3 moments" card | The three progress pebbles use the welcome screen's colours with an ink outline. Pebbles for moments not logged yet are softer, so progress still reads. |
+| **New icons** | App-wide | People, more (⋯) and heart icons in the app's hand-drawn style. |
+| **Fix: "5 and up" filter** | Circle feed | The `5y+` age band is now URL-encoded; a raw `+` was read as a space and rejected. |
+| **Refactor: one moment pipeline** | API | Saving a moment (safety, tagging, patterns) moved from the Story route into `createMoment()`, shared by the parent's journal and caregiver notes. |
+
+### 4. Quality work behind these features
+
+- **26 new automated tests** (77 in total, all passing):
+  - `test/community.test.ts` (18): anonymity, nickname scrubbing, PII rules, crisis handling, developmental worries, medication review, the harassment block, fail-closed moderation, reports and approval, blocking, reactions, rate limits, age bands and the nearby fallback, the guide reply's citations, no guide reply for uncovered questions, win stats, and the `5y+` band.
+  - `test/playbook.test.ts` (8): default and entitlement rules for shared wins, unguessable links and the 5-person limit, page content and escaping, privacy (no email or other moments on the page), caregiver notes becoming tagged moments and counting towards patterns, red-flag handling, revoked links, other parents' caregivers, and rate limits.
+- **Live-model checks with Groq:**
+  - 10 hand-written Circles replies (support, venting, own child's diagnosis, "see a doctor", a dose, a diagnosis, an insult, spam, off-topic, shaming) were all handled as intended.
+  - A full Family Playbook run went from link, to page, to note, to the tagged moment in Story.
+- **AI mistakes log:** three new entries in [AI_MISTAKES.md](AI_MISTAKES.md):
+  - The guide reply citing the wrong goal, fixed by a stricter match rule.
+  - A moderation rule that would have blocked parents venting about themselves.
+  - Three regex slips, found by tests.
+- **Existing evals:** `npm run eval` still produces the same results as before these features.
 
 ## Feature brief: Circles
 
@@ -106,6 +221,68 @@ Built end to end: API, database migration, moderation, mobile screens, and 18 au
 2. Push notifications for replies.
 3. A weekly AI digest per circle ("This week, parents of 2-year-olds found…").
 4. Semantic search (pgvector) so the guide answers more questions.
+
+## Feature brief: Family Playbook
+
+> **In one line:** every adult who looks after the child gets the same plan and the same words, on a link that needs no app, and their notes flow back into the parent's Story.
+
+### The problem
+
+ParentPal coaches **one parent**. But a toddler's day, especially in Indian joint families, is shared between several adults: Nani or Dadi, the other parent, a nanny, a daycare teacher. Behaviour plans fail when the adults respond differently. Mum holds the screen-time limit, Nani hands over the phone, and the child learns that pushing harder works.
+
+Every goal guide in ParentPal repeats the same point: **consistency** is what makes a win stick. Until now the app gave the parent no way to get that consistency from the rest of the family.
+
+### How it works for the parent
+
+1. **Pick what to share.** On a win, tap **Send to family**, or open *Family playbook* from Home or Profile. By default it shares win 1 of each of your goals, up to 4 wins. Fewer is easier to stick to.
+2. **Add a person.** Type what your child calls them ("Nani", "Papa", "Aunty Meena") and pick a relationship. Tap **Create link and share**. The phone's share sheet opens with a warm, ready-to-send WhatsApp message and the private link.
+3. **See that it's working.** Each person shows "Opened 2h ago · 3 notes". Their notes appear in Story as **"Logged by Nani"** and count towards the 3 moments needed for a pattern.
+4. **Stay in control.** Remove a person and their link stops working at once. Notes they already sent stay in the journal.
+
+### How it works for the grandparent
+
+They tap the link on WhatsApp, and a simple page opens. There's nothing to install and no sign-up.
+
+- *"Hi Nani! Here's what we're trying with Aarav right now, shared by Priya (Mom)."*
+- One card per win: **What to do**, **Say this** (the exact words, in large type), and **What to expect**.
+- **How did it go?** Two big buttons, "It worked" or "It was tough", plus an optional line of text, then **Send note**.
+
+### Why it matters for the business
+
+- **Better outcomes:** the plan only works if everyone follows it. This is the missing piece between the advice and real behaviour change at home.
+- **More data, better AI:** patterns now draw on notes from the whole household, not just one parent's memory at the end of the day. A grandparent with the child all afternoon sees things the parent doesn't.
+- **Distribution:** every parent sends 1–3 links on WhatsApp, the channel Indian families already use. Every grandparent, nanny and teacher who opens one sees ParentPal's guidance working, at no acquisition cost. Teachers and nannies look after many children, which makes them a natural channel to more parents.
+- **Retention:** notes from family arriving in Story give the parent a reason to come back.
+
+### Trust, safety and privacy
+
+| Concern | What the playbook does |
+|---|---|
+| Someone guesses a link | Links carry 32 random bytes and can be turned off at any time (it returns 410 Gone). |
+| The caregiver sees too much | The page shows only the child's nickname, the parent's first name and role, and the shared wins. Never chat, other moments, patterns or email. |
+| The advice gets changed | The page shows the win's own expert-sourced text **unchanged**. No AI rewrites it, so nothing can drift from the source. |
+| A caregiver writes something alarming | The same safety rules as the app. A red-flag note (e.g. "he swallowed a battery") is never sent to the AI; the caregiver sees helplines straight away, and the parent sees the note in Story. |
+| The page gets indexed or leaks | `noindex`, `no-referrer`, a strict Content-Security-Policy, `no-store` caching. Free-text fields are HTML-escaped. |
+| Spam | 20 notes per link per day. At most 5 people per family. |
+
+### Metrics to watch
+
+Proposed, not yet instrumented:
+
+- % of active parents who share at least one link, and links per parent.
+- % of links opened within 24 hours, and % of opened links that send at least one note.
+- Notes per week from caregivers vs. parents, and time to first pattern for families with caregivers.
+- Retention (D30) of parents with an active caregiver vs. without.
+- Downloads attributed to playbook pages (needs a "Get ParentPal" link once the app is in the stores).
+
+### What's next
+
+1. **Languages:** Hindi, Telugu, Tamil and others for grandparents. The page and data model are ready for it; it needs a reviewed translation step.
+2. A short daily "today's focus" message to caregivers.
+3. Showing the parent which wins caregivers find hard.
+4. A "Get ParentPal" link on the page once there's a store listing.
+
+Engineering details are in [How the Family Playbook works](#how-the-family-playbook-works).
 
 ## Architecture
 
@@ -261,6 +438,23 @@ Three reports from different parents hide an item until a moderator decides; onc
 | `apps/api/src/services/moderation.ts` | PII rules, nickname scrub, safety gate, medication rule, LLM verdict |
 | `apps/mobile/src/app/(tabs)/circles.tsx`, `circle/[goal].tsx`, `post/[id].tsx`, `post/new.tsx` | Circles tab, feed, post and composer |
 
+### How the Family Playbook works
+
+- **Data:**
+  - `caregivers` holds the name, relation, a random token, `revokedAt` and `lastOpenedAt`.
+  - `playbook_wins` holds the parent's chosen wins.
+  - `moments.caregiverId` and `moments.loggedBy` record who logged a moment. The name is a snapshot, so it survives removing the caregiver.
+- **Entitlement:** only wins the parent can see can be shared (win 1, or any win with a subscription). If a subscription lapses, locked wins drop out of the page.
+- **One moment pipeline:** `createMoment()` in `services/story.ts` is used by both the parent's Story and the caregiver page. It runs the safety check, then LLM tagging, then the pattern check, so caregiver notes behave exactly like the parent's.
+- **Public page:** `routes/publicPlaybook.ts` serves server-rendered HTML at `/p/:token` and accepts notes at `POST /p/:token/log`. It lives outside `/v1` and needs no auth; the link is the key.
+- **Link host:** set by `PUBLIC_BASE_URL`. If that's empty it uses `https://<NGROK_DOMAIN>`, then `http://localhost:<PORT>`, so links work from other phones during development. ngrok's free plan shows its own warning page the first time a browser opens a link. A real deployment wouldn't have this.
+
+| File | Role |
+|---|---|
+| `apps/api/src/services/playbook.ts` | Shared wins, caregivers, links, the public view, caregiver notes, rate limit |
+| `apps/api/src/routes/playbook.ts`, `routes/publicPlaybook.ts` | Parent API; caregiver page and note endpoint |
+| `apps/mobile/src/app/family.tsx` | Family playbook screen (choose wins, add, share, remove) |
+
 ### LLM providers
 
 `apps/api/src/llm/` exposes `complete()`, `stream()` and `json<T>(schema)` with three adapters behind one `LLMProvider` interface:
@@ -346,6 +540,7 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Story:** `GET|POST /moments`, `DELETE /moments/:id`, `GET /patterns`, `POST /patterns/generate`
 - **Chat:** `GET /chat`, `DELETE /chat` (starts a fresh conversation; bookmarked replies are kept), `GET /chat/starters`, `GET /chat/topics`, `POST /chat/messages` (SSE: `meta` → `delta`* → `done`), feedback and bookmark routes, `GET /bookmarks`
 - **Notifications:** `GET /notifications?today=YYYY-MM-DD` (inbox; hides tips dated after the device's today), `GET /notifications/upcoming?from=YYYY-MM-DD&days=1-3` (creates and returns the next days' tips for on-device scheduling; `from` must be within a day of the server's date), `POST /notifications/:id/read`
+- **Family playbook:** `GET /playbook`, `PUT /playbook/wins`, `POST /caregivers` (returns the link and a ready-to-send message), `DELETE /caregivers/:id` (turns the link off). Public, no auth: `GET /p/:token` (HTML page), `POST /p/:token/log`.
 - **Circles:** `GET /circles`, `GET|POST /circles/:goal/posts` (`?band=2-3y|all&cursor=`), `GET|DELETE /posts/:id`, `POST /posts/:id/replies`, `DELETE /replies/:id`, `POST /reactions` (toggles), `POST /reports`, `POST /blocks`. Writes need a signed-up account.
 - **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`, `GET /admin/community/queue`, `POST /admin/community/:type/:id` (`approve` or `remove`)
 
@@ -376,6 +571,7 @@ Seven goals exist. Three have full content: **handling tantrums**, **fixing slee
 - Only the child's birth **month and year** are stored, never the full date.
 - `llm_calls` stores metrics only, never prompts or outputs. `safety_events` stores the category only.
 - Notifications are scheduled on the phone, so their text (which includes the child's nickname) never passes through a push service. Notification settings and pending check-ins are stored only on the device.
+- Family Playbook links are 32-byte random tokens that can be revoked. The page shows only the shared wins, the child's nickname and the parent's first name. Caregiver notes go through the same safety gate as the parent's.
 - Circles show a per-circle pseudonym and a coarse label ("Mom of a 2-year-old"), never a name, email or child's nickname. The API never returns another user's id.
 - Every user-owned table cascades from `users`, so deleting an account removes all of that user's data. A test checks this.
 

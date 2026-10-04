@@ -1,13 +1,12 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { ageInMonths, CreateMoment, CreateMomentResponse, formatAge, Moment, Pattern } from "@parentpal/shared";
+import { CreateMoment, CreateMomentResponse, Moment, Pattern } from "@parentpal/shared";
 import { db, schema } from "../db/client";
 import { requireUser } from "../lib/auth";
 import { HttpError, notFound } from "../lib/errors";
 import { toMoment, toPattern } from "../lib/serialize";
-import { checkSafety } from "../services/safety";
-import { generatePattern, maybeGeneratePattern, tagMoment } from "../services/story";
+import { createMoment, generatePattern } from "../services/story";
 
 async function ownedChild(userId: string, childId: string) {
   const [c] = await db
@@ -45,33 +44,7 @@ export const storyRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post("/moments", { schema: { body: CreateMoment, response: { 200: CreateMomentResponse } } }, async (req) => {
     const child = await ownedChild(req.userId, req.body.childId);
-
-    // Safety first: a red-flag moment is saved (it's the parent's journal) but not sent to the LLM.
-    const safety = checkSafety(req.body.text);
-    if (safety) {
-      await db.insert(schema.safetyEvents).values({ userId: req.userId, surface: "moment", category: safety.category });
-      const [m] = await db
-        .insert(schema.moments)
-        .values({ userId: req.userId, childId: child.id, text: req.body.text, tagStatus: "safety" })
-        .returning();
-      return { moment: toMoment(m), safety, newPattern: null };
-    }
-
-    const tags = await tagMoment(req.userId, req.body.text, `${child.nickname}, ${formatAge(ageInMonths(child.birthMonth, child.birthYear))}`);
-    const [m] = await db
-      .insert(schema.moments)
-      .values({
-        userId: req.userId,
-        childId: child.id,
-        text: req.body.text,
-        trigger: tags?.trigger ?? null,
-        behavior: tags?.behavior ?? null,
-        outcome: tags?.outcome ?? null,
-        tagStatus: tags ? "ok" : "failed",
-      })
-      .returning();
-    const newPattern = await maybeGeneratePattern(req.userId, child.id);
-    return { moment: toMoment(m), safety: null, newPattern };
+    return createMoment(req.userId, child, req.body.text);
   });
 
   app.delete("/moments/:id", { schema: { params: z.object({ id: z.string().uuid() }) } }, async (req) => {

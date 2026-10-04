@@ -3,6 +3,9 @@ import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 import { localDateISO } from "./dates";
 import type {
+  CreateCaregiver,
+  CreateCaregiverResponse,
+  PlaybookResponse,
   AgeBand,
   CirclesResponse,
   CommunityReply,
@@ -135,6 +138,11 @@ export const api = {
   report: (targetType: TargetType, targetId: string, reason: ReportReason) =>
     request<{ reported: true; hidden: boolean }>("POST", "/reports", { targetType, targetId, reason }),
   block: (targetType: TargetType, targetId: string) => request<{ blocked: true }>("POST", "/blocks", { targetType, targetId }),
+
+  playbook: () => request<PlaybookResponse>("GET", "/playbook"),
+  setPlaybookWins: (winIds: string[]) => request<PlaybookResponse>("PUT", "/playbook/wins", { winIds }),
+  addCaregiver: (body: CreateCaregiver) => request<CreateCaregiverResponse>("POST", "/caregivers", body),
+  revokeCaregiver: (id: string) => request<{ revoked: true }>("DELETE", `/caregivers/${id}`),
 };
 
 /**

@@ -12,6 +12,13 @@ export const GOAL_SLUGS = [
   "focus",
   "sleep",
   "potty-training",
+  "sibling-rivalry",
+  "anger",
+  "lying",
+  "bedwetting",
+  "speech-language",
+  "school-anxiety",
+  "separation-anxiety",
 ] as const;
 export const GoalSlug = z.enum(GOAL_SLUGS);
 export type GoalSlug = z.infer<typeof GoalSlug>;
@@ -186,6 +193,8 @@ export const Moment = z.object({
   behavior: z.string().nullable(),
   outcome: z.string().nullable(),
   tagStatus: z.enum(["ok", "failed", "safety"]),
+  /** Set when a caregiver logged it from a Family Playbook link, e.g. "Nani". */
+  loggedBy: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 export type Moment = z.infer<typeof Moment>;
@@ -453,6 +462,66 @@ export const CostSummary = z.object({
   byDay: z.array(z.object({ day: z.string(), calls: z.number(), costUsd: z.number() })),
 });
 export type CostSummary = z.infer<typeof CostSummary>;
+
+/* ------------------------------------------------------------------ */
+/* Family Playbook: share the plan with other caregivers               */
+/* ------------------------------------------------------------------ */
+
+export const MAX_CAREGIVERS = 5;
+export const MAX_PLAYBOOK_WINS = 4;
+
+export const Relation = z.enum(["grandparent", "parent", "nanny", "teacher", "other"]);
+export type Relation = z.infer<typeof Relation>;
+export const RELATION_LABELS: Record<Relation, string> = {
+  grandparent: "Grandparent",
+  parent: "Other parent",
+  nanny: "Nanny",
+  teacher: "Teacher",
+  other: "Other",
+};
+
+export const Caregiver = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  relation: Relation,
+  url: z.string(),
+  lastOpenedAt: z.string().nullable(),
+  notesCount: z.number().int(),
+  createdAt: z.string(),
+});
+export type Caregiver = z.infer<typeof Caregiver>;
+
+export const CreateCaregiver = z.object({
+  name: z.string().trim().min(1, "Add a name").max(30),
+  relation: Relation,
+});
+export type CreateCaregiver = z.infer<typeof CreateCaregiver>;
+
+export const PlaybookWin = z.object({
+  id: z.string(),
+  goalSlug: GoalSlug,
+  goalTitle: z.string(),
+  position: z.number().int(),
+  title: z.string(),
+  action: z.string(),
+  script: z.string(),
+  whatToExpect: z.string(),
+});
+export type PlaybookWin = z.infer<typeof PlaybookWin>;
+
+export const PlaybookResponse = z.object({
+  childNickname: z.string().nullable(),
+  wins: z.array(PlaybookWin),
+  /** Wins the parent can add: unlocked wins from their goals. */
+  available: z.array(PlaybookWin.pick({ id: true, goalSlug: true, goalTitle: true, position: true, title: true })),
+  caregivers: z.array(Caregiver),
+});
+export type PlaybookResponse = z.infer<typeof PlaybookResponse>;
+
+export const SetPlaybookWins = z.object({ winIds: z.array(z.string()).max(MAX_PLAYBOOK_WINS) });
+
+export const CreateCaregiverResponse = z.object({ caregiver: Caregiver, shareText: z.string() });
+export type CreateCaregiverResponse = z.infer<typeof CreateCaregiverResponse>;
 
 /* ------------------------------------------------------------------ */
 /* Helpers shared by client and server                                 */

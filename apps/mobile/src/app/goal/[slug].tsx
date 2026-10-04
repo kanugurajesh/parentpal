@@ -119,6 +119,13 @@ function WinCard({ win, accent, goalSlug }: { win: Win; accent: string; goalSlug
         accessibilityHint="Tell other parents in Circles whether this worked for you"
         onPress={() => router.push({ pathname: "/post/new", params: { goal: goalSlug, kind: "worked", winId: win.id } })}
       />
+      <Button
+        label="Send to family"
+        kind="ghost"
+        icon="share"
+        accessibilityHint="Adds this win to the playbook you share with grandparents, a nanny or a teacher"
+        onPress={() => router.push({ pathname: "/family", params: { addWin: win.id } })}
+      />
     </View>
   );
 }

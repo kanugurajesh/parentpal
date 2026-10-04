@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { GOAL_SLUGS } from "@parentpal/shared";
 import { loadContent } from "../src/seed/content";
 import { guest, makeApp, onboarded, type App } from "./helpers";
 
@@ -11,12 +12,14 @@ afterAll(() => app.close());
 describe("content", () => {
   it("parses every goal file and only cites known sources", () => {
     const { goals, sources } = loadContent();
-    expect(goals).toHaveLength(7);
+    expect(goals.map((g) => g.slug).sort()).toEqual([...GOAL_SLUGS].sort());
     const withContent = goals.filter((g) => g.wins.length);
-    expect(withContent.map((g) => g.slug).sort()).toEqual(["picky-eating", "sleep", "tantrums"]);
+    expect(withContent).toHaveLength(GOAL_SLUGS.length);
+    // Full guides have 4–5 wins; the newer goals start with a single win.
+    const fullGuides = ["picky-eating", "sleep", "tantrums"];
     const ids = new Set(sources.map((s) => s.id));
     for (const g of withContent) {
-      expect(g.wins.length).toBeGreaterThanOrEqual(4);
+      expect(g.wins.length).toBeGreaterThanOrEqual(fullGuides.includes(g.slug) ? 4 : 1);
       expect(g.wins.length).toBeLessThanOrEqual(5);
       for (const w of g.wins) {
         expect(w.sourceIds.length).toBeGreaterThan(0);
@@ -33,7 +36,7 @@ describe("goals", () => {
     const res = await app.inject({ method: "GET", url: "/v1/goals", headers: g.auth });
     const body = res.json();
     expect(body.personalized.map((x: { slug: string }) => x.slug)).toEqual(["sleep", "tantrums"]);
-    expect(body.others).toHaveLength(5);
+    expect(body.others).toHaveLength(GOAL_SLUGS.length - 2);
   });
 
   it("filters by category chip", async () => {

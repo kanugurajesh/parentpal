@@ -17,6 +17,8 @@ import { communityRoutes } from "./routes/community";
 import { goalRoutes } from "./routes/goals";
 import { meRoutes } from "./routes/me";
 import { notificationRoutes } from "./routes/notifications";
+import { playbookRoutes } from "./routes/playbook";
+import { publicPlaybookRoutes } from "./routes/publicPlaybook";
 import { storyRoutes } from "./routes/story";
 
 export async function buildApp() {
@@ -45,6 +47,9 @@ export async function buildApp() {
 
   app.get("/health", async () => ({ ok: true, llm: llm.info }));
 
+  // Family Playbook pages for caregivers: public, outside /v1 (no app, no login; the link is the key).
+  await app.register(publicPlaybookRoutes);
+
   await app.register(
     async (v1) => {
       await v1.register(authRoutes);
@@ -54,6 +59,7 @@ export async function buildApp() {
       await v1.register(chatRoutes);
       await v1.register(notificationRoutes);
       await v1.register(communityRoutes);
+      await v1.register(playbookRoutes);
       await v1.register(adminRoutes);
     },
     { prefix: "/v1" },

@@ -82,6 +82,64 @@ function art(key: string, deep: string, ink: string) {
           <Circle cx={78} cy={45} r={2.5} fill={ink} />
         </G>
       );
+    case "siblings":
+      return (
+        <G>
+          <Circle cx={44} cy={44} r={13} fill={color.apricot} stroke={ink} strokeWidth={2.5} />
+          <Path d="M24 94c0-16 9-28 20-28s20 12 20 28z" fill={color.apricot} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Circle cx={78} cy={56} r={10} fill={color.white} stroke={ink} strokeWidth={2.5} />
+          <Path d="M62 94c0-12 7-22 16-22s16 10 16 22z" fill={deep} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+        </G>
+      );
+    case "volcano":
+      return (
+        <G>
+          <Path d="M20 94l26-46h28l26 46z" fill={color.white} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M46 48c4 6 10 6 14 0 4 6 10 6 14 0" fill={color.apricot} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M52 36l-4-10M60 34V22M68 36l4-10" stroke={deep} strokeWidth={3} strokeLinecap="round" />
+        </G>
+      );
+    case "truth":
+      return (
+        <G>
+          <Path d="M26 32h68a6 6 0 0 1 6 6v36a6 6 0 0 1-6 6H54L40 94V80H26a6 6 0 0 1-6-6V38a6 6 0 0 1 6-6z" fill={color.white} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M44 56l10 10 20-20" stroke={deep} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </G>
+      );
+    case "drop":
+      return (
+        <G>
+          <Rect x={18} y={70} width={84} height={22} rx={10} fill={color.white} stroke={ink} strokeWidth={2.5} />
+          <Path d="M60 22c10 14 18 24 18 34a18 18 0 0 1-36 0c0-10 8-20 18-34z" fill={color.apricot} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M90 30l1.5 3.5L95 35l-3.5 1.5L90 40l-1.5-3.5L85 35l3.5-1.5z" fill={deep} />
+        </G>
+      );
+    case "chat":
+      return (
+        <G>
+          <Path d="M20 28h46a6 6 0 0 1 6 6v22a6 6 0 0 1-6 6H38l-12 10V62h-6a6 6 0 0 1-6-6V34a6 6 0 0 1 6-6z" fill={color.white} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M54 58h46a6 6 0 0 1 6 6v20a6 6 0 0 1-6 6h-6v10L82 90H54a6 6 0 0 1-6-6V64a6 6 0 0 1 6-6z" fill={color.apricot} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Circle cx={32} cy={45} r={3} fill={deep} />
+          <Circle cx={43} cy={45} r={3} fill={deep} />
+          <Circle cx={54} cy={45} r={3} fill={deep} />
+        </G>
+      );
+    case "backpack":
+      return (
+        <G>
+          <Path d="M48 30v-6a12 12 0 0 1 24 0v6" stroke={ink} strokeWidth={2.5} fill="none" />
+          <Rect x={32} y={30} width={56} height={64} rx={14} fill={color.apricot} stroke={ink} strokeWidth={2.5} />
+          <Rect x={42} y={62} width={36} height={22} rx={6} fill={color.white} stroke={ink} strokeWidth={2.5} />
+          <Path d="M42 48h36" stroke={deep} strokeWidth={3} strokeLinecap="round" />
+        </G>
+      );
+    case "hearts":
+      return (
+        <G>
+          <Path d="M50 92S20 74 20 52c0-10 8-18 17-18 6 0 10 3 13 8 3-5 7-8 13-8 9 0 17 8 17 18 0 22-30 40-30 40z" fill={color.apricot} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+          <Path d="M88 56s-14-8-14-18c0-5 4-8 8-8 3 0 5 1 6 4 1-3 3-4 6-4 4 0 8 3 8 8 0 10-14 18-14 18z" fill={color.white} stroke={ink} strokeWidth={2.5} strokeLinejoin="round" />
+        </G>
+      );
     default:
       return <Circle cx={60} cy={60} r={20} fill={deep} />;
   }

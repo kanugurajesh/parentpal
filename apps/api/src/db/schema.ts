@@ -27,7 +27,8 @@ export const subStatus = pgEnum("sub_status", ["active_fake", "canceled"]);
 export const tagStatus = pgEnum("tag_status", ["ok", "failed", "safety"]);
 export const msgRole = pgEnum("msg_role", ["user", "assistant"]);
 export const msgKind = pgEnum("msg_kind", ["answer", "clarify", "safety"]);
-export const safetySurface = pgEnum("safety_surface", ["chat", "moment", "community"]);
+export const safetySurface = pgEnum("safety_surface", ["chat", "moment", "community", "caregiver"]);
+export const caregiverRelation = pgEnum("caregiver_relation", ["grandparent", "parent", "nanny", "teacher", "other"]);
 export const postKind = pgEnum("post_kind", ["question", "worked", "share"]);
 export const modStatus = pgEnum("mod_status", ["live", "review", "hidden", "removed"]);
 export const workedOutcome = pgEnum("worked_outcome", ["helped", "somewhat", "didnt"]);
@@ -163,9 +164,46 @@ export const moments = pgTable(
     behavior: text("behavior"),
     outcome: text("outcome"),
     tagStatus: tagStatus("tag_status").notNull(),
+    /** Set when logged from a Family Playbook link. The name is a snapshot, so it survives removing the caregiver. */
+    caregiverId: uuid("caregiver_id").references(() => caregivers.id, { onDelete: "set null" }),
+    loggedBy: text("logged_by"),
     createdAt: createdAt(),
   },
   (t) => [index("moments_user_created_idx").on(t.userId, t.createdAt)],
+);
+
+/* ---------------- Family Playbook ---------------- */
+
+/** Another adult in the child's life, reached through a secret link (no app, no login). */
+export const caregivers = pgTable(
+  "caregivers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userRef(),
+    childId: uuid("child_id")
+      .notNull()
+      .references(() => children.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    relation: caregiverRelation("relation").notNull(),
+    token: text("token").notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastOpenedAt: timestamp("last_opened_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("caregivers_token_idx").on(t.token), index("caregivers_user_idx").on(t.userId)],
+);
+
+/** The wins the parent chose to share with every caregiver. */
+export const playbookWins = pgTable(
+  "playbook_wins",
+  {
+    userId: userRef(),
+    winId: text("win_id")
+      .notNull()
+      .references(() => wins.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.winId] })],
 );
 
 export const patterns = pgTable("patterns", {

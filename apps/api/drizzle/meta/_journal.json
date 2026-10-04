@@ -22,6 +22,13 @@
       "when": 1791033304316,
       "tag": "0002_community",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791036029463,
+      "tag": "0003_family_playbook",
+      "breakpoints": true
     }
   ]
 }

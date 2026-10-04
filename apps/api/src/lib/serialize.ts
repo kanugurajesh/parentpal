@@ -32,6 +32,7 @@ export const toMoment = (m: Row<typeof schema.moments>): Moment => ({
   behavior: m.behavior,
   outcome: m.outcome,
   tagStatus: m.tagStatus,
+  loggedBy: m.loggedBy,
   createdAt: iso(m.createdAt),
 });
 

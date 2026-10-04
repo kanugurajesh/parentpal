@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatAge, type GoalFilter } from "@parentpal/shared";
 import { FeaturedGoalCard, GoalTile } from "@/components/GoalCards";
+import { Icon } from "@/components/Icon";
 import { Pebble } from "@/components/Pebble";
 import { Button, Chip, Disclaimer, ErrorNote, Loading, T } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -123,6 +124,27 @@ export default function Home() {
           </View>
         </View>
 
+        {/* Family playbook */}
+        <View style={{ paddingHorizontal: GUTTER, marginTop: space.lg }}>
+          <Pressable
+            onPress={() => router.push("/family")}
+            accessibilityRole="button"
+            accessibilityHint="Share the words you use with grandparents, a nanny or a teacher"
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: pressed ? color.paperDeep : color.card, borderRadius: radius.card, padding: space.lg, borderWidth: 1.5, borderColor: color.line })}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: color.mossTint, alignItems: "center", justifyContent: "center" }}>
+              <Icon name="people" size={22} color={color.moss} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <T variant="bodyStrong">Get the whole family on the same page</T>
+              <T variant="small" color={color.inkMuted}>
+                Send {name === "Your child" ? "your child's" : `${name}'s`} plan to Nani, Dad or the nanny. No app needed.
+              </T>
+            </View>
+            <Icon name="chevronRight" size={18} color={color.inkMuted} />
+          </Pressable>
+        </View>
+
         {/* Filters */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: GUTTER, gap: space.sm, marginTop: space.xxl }}>
           {FILTERS.map((f) => (
@@ -136,9 +158,12 @@ export default function Home() {
 
           {goals.data?.personalized.length ? (
             <View style={{ gap: space.md }}>
-              <T variant="h2" accessibilityRole="header">
-                Your personalized goals
-              </T>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm }}>
+                <T variant="h2" accessibilityRole="header" style={{ flex: 1 }}>
+                  Your personalized goals
+                </T>
+                <Button label="Edit" kind="ghost" onPress={() => router.push("/goals")} accessibilityHint="Change the goals you're working on" />
+              </View>
               {goals.data.personalized.map((g) => (
                 <FeaturedGoalCard key={g.slug} goal={g} subscribed={subscribed} />
               ))}

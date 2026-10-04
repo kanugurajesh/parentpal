@@ -20,6 +20,9 @@ const EnvSchema = z.object({
   LLM_PRICE_INPUT_PER_M: z.coerce.number().default(0.15),
   LLM_PRICE_OUTPUT_PER_M: z.coerce.number().default(0.6),
   DAILY_TIP_CRON: z.string().default("0 8 * * *"),
+  /** Where Family Playbook links point. Falls back to the ngrok domain, then localhost. */
+  PUBLIC_BASE_URL: z.string().default(""),
+  NGROK_DOMAIN: z.string().default(""),
 });
 
 const parsed = EnvSchema.parse(process.env);
@@ -29,6 +32,10 @@ export const env = {
   ...parsed,
   isTest,
   databaseUrl: isTest ? parsed.TEST_DATABASE_URL : parsed.DATABASE_URL,
+  publicBaseUrl: (
+    parsed.PUBLIC_BASE_URL ||
+    (parsed.NGROK_DOMAIN ? `https://${parsed.NGROK_DOMAIN.replace(/^https?:\/\//, "")}` : `http://localhost:${parsed.PORT}`)
+  ).replace(/\/$/, ""),
   /** Tests always use the deterministic mock so they never cost money or flake. */
   llmProvider: (isTest
     ? "mock"

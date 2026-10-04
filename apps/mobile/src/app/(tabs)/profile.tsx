@@ -3,6 +3,7 @@ import { Linking, View } from "react-native";
 import { confirm } from "@/lib/confirm";
 import { formatAge } from "@parentpal/shared";
 import { ListRow, Screen, T } from "@/components/ui";
+import { goalTitle } from "@/lib/goals";
 import { useSession } from "@/lib/session";
 import { color, radius, space } from "@/theme/tokens";
 
@@ -64,6 +65,13 @@ export default function Profile() {
           {user?.isGuest ? (
             <ListRow icon="person" label="Create account" detail="Keep your profile if you change phones" onPress={() => router.push({ pathname: "/sign-in", params: { mode: "create" } })} />
           ) : null}
+          <ListRow
+            icon="check"
+            label="Your goals"
+            detail={me?.goals.length ? me.goals.map(goalTitle).join(", ") : "Pick what to work on"}
+            onPress={() => router.push("/goals")}
+          />
+          <ListRow icon="people" label="Family playbook" detail="Share the plan with grandparents, nanny or teacher" onPress={() => router.push("/family")} />
           <ListRow icon="bookmark" label="Bookmarks" detail="Answers you saved from Ask" onPress={() => router.push("/bookmarks")} />
           <ListRow
             icon="spark"
