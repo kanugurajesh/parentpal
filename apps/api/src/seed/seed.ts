@@ -1,12 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { sql } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { db, schema, sqlClient } from "../db/client";
 import { loadContent } from "./content";
 
 /**
  * Idempotent: content tables are upserted/replaced from /content, user data is untouched.
- * Wins and chunks are deleted and re-inserted, so renaming a win in markdown just works.
+ * Chunks are deleted and re-inserted. Wins are upserted by id and only removed wins are deleted:
+ * deleting a win cascades to user data that points at it (tries, playbook choices).
  */
 export async function seedContent() {
   const { sources, goals } = loadContent();
@@ -36,8 +37,14 @@ export async function seedContent() {
       };
       await tx.insert(schema.goals).values(row).onConflictDoUpdate({ target: schema.goals.slug, set: row });
       await tx.delete(schema.contentChunks).where(sql`${schema.contentChunks.goalSlug} = ${g.slug}`);
-      await tx.delete(schema.wins).where(sql`${schema.wins.goalSlug} = ${g.slug}`);
-      if (g.wins.length) await tx.insert(schema.wins).values(g.wins.map((w) => ({ ...w, goalSlug: g.slug })));
+      const ids = g.wins.map((w) => w.id);
+      await tx
+        .delete(schema.wins)
+        .where(ids.length ? and(eq(schema.wins.goalSlug, g.slug), notInArray(schema.wins.id, ids)) : eq(schema.wins.goalSlug, g.slug));
+      for (const w of g.wins) {
+        const win = { ...w, goalSlug: g.slug };
+        await tx.insert(schema.wins).values(win).onConflictDoUpdate({ target: schema.wins.id, set: win });
+      }
       if (g.chunks.length)
         await tx.insert(schema.contentChunks).values(g.chunks.map((c) => ({ ...c, goalSlug: g.slug })));
     }

@@ -17,6 +17,7 @@ import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
 import { winCommunityStats } from "../services/community";
 import { isSubscribed } from "../services/entitlement";
+import { winProgress } from "../services/progress";
 import { loadMe } from "./me";
 
 async function sourceMap(ids: string[]) {
@@ -102,6 +103,7 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
       const sources = await sourceMap([...new Set([...g.sourceIds, ...wins.flatMap((w) => w.sourceIds)])]);
       const pick = (ids: string[]) => ids.map((id) => sources.get(id)).filter((s): s is Source => !!s);
       const community = await winCommunityStats(wins.map((w) => w.id));
+      const mine = await winProgress(req.userId, wins.map((w) => w.id));
 
       return {
         slug: g.slug as GoalSlug,
@@ -126,6 +128,7 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
             whatToExpect: locked ? null : w.whatToExpect,
             sources: pick(w.sourceIds),
             community: community.get(w.id) ?? null,
+            mine: locked ? null : (mine.get(w.id) ?? null),
           };
         }),
       };

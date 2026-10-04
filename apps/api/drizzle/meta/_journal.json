@@ -36,6 +36,13 @@
       "when": 1791085777494,
       "tag": "0004_playbook_chosen",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791086799305,
+      "tag": "0005_win_tries",
+      "breakpoints": true
     }
   ]
 }

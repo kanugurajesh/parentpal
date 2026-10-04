@@ -18,6 +18,7 @@ import { goalRoutes } from "./routes/goals";
 import { meRoutes } from "./routes/me";
 import { notificationRoutes } from "./routes/notifications";
 import { playbookRoutes } from "./routes/playbook";
+import { progressRoutes } from "./routes/progress";
 import { publicPlaybookRoutes } from "./routes/publicPlaybook";
 import { storyRoutes } from "./routes/story";
 
@@ -56,6 +57,7 @@ export async function buildApp() {
       await v1.register(meRoutes);
       await v1.register(goalRoutes);
       await v1.register(storyRoutes);
+      await v1.register(progressRoutes);
       await v1.register(chatRoutes);
       await v1.register(notificationRoutes);
       await v1.register(communityRoutes);

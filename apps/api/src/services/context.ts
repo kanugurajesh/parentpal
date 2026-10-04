@@ -1,12 +1,15 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { ageInMonths, formatAge } from "@parentpal/shared";
 import { db, schema } from "../db/client";
+import { describeProgress } from "./progress";
 
 export interface FamilyContext {
   parentName: string | null;
   children: { id: string; nickname: string; sex: "girl" | "boy"; ageMonths: number }[];
   goals: { slug: string; title: string }[];
   recentMoments: { childNickname: string; text: string; trigger: string | null; behavior: string | null; outcome: string | null }[];
+  /** How the wins they tried went, e.g. "Name the feeling (Tantrums): helped 3 of 4 tries". */
+  progress?: string | null;
 }
 
 /** Everything personal the LLM may see. Kept small on purpose: nickname, age in months, goals, recent moments. */
@@ -33,6 +36,7 @@ export async function loadFamilyContext(userId: string): Promise<FamilyContext> 
     recentMoments: moments
       .filter((m) => m.tagStatus !== "safety")
       .map((m) => ({ childNickname: nick.get(m.childId) ?? "child", text: m.text, trigger: m.trigger, behavior: m.behavior, outcome: m.outcome })),
+    progress: await describeProgress(userId),
   };
 }
 
@@ -46,5 +50,6 @@ export function describeFamily(ctx: FamilyContext): string {
         .map((m) => `- ${m.childNickname}: trigger=${m.trigger ?? "?"}; behavior=${m.behavior ?? "?"}; outcome=${m.outcome ?? "?"}`)
         .join("\n")
     : "- none logged yet";
-  return `Parent: ${ctx.parentName ?? "unknown"}\nChildren: ${kids}\nActive goals: ${goals}\nRecent logged moments:\n${moments}`;
+  const tried = ctx.progress ? `\nWins they tried and how it went: ${ctx.progress}` : "";
+  return `Parent: ${ctx.parentName ?? "unknown"}\nChildren: ${kids}\nActive goals: ${goals}\nRecent logged moments:\n${moments}${tried}`;
 }

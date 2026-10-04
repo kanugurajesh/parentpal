@@ -208,6 +208,31 @@ export const playbookWins = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.winId] })],
 );
 
+/* ---------------- Progress ---------------- */
+
+/** One attempt at a win ("I'll try this"), open until someone says how it went. */
+export const winTries = pgTable(
+  "win_tries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userRef(),
+    childId: uuid("child_id")
+      .notNull()
+      .references(() => children.id, { onDelete: "cascade" }),
+    winId: text("win_id")
+      .notNull()
+      .references(() => wins.id, { onDelete: "cascade" }),
+    goalSlug: text("goal_slug").notNull(),
+    outcome: workedOutcome("outcome"),
+    momentId: uuid("moment_id").references(() => moments.id, { onDelete: "set null" }),
+    /** Set when a caregiver reported it from a Family Playbook link. */
+    caregiverId: uuid("caregiver_id").references(() => caregivers.id, { onDelete: "set null" }),
+    reportedAt: timestamp("reported_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("win_tries_user_goal_idx").on(t.userId, t.goalSlug, t.createdAt)],
+);
+
 export const patterns = pgTable("patterns", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: userRef(),

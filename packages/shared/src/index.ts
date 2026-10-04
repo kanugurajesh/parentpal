@@ -168,6 +168,11 @@ export const Win = z.object({
   sources: z.array(Source),
   /** "What worked" reports from Circles. Null until enough parents have reported (no small-sample stats). */
   community: z.object({ tried: z.number().int(), helped: z.number().int() }).nullable().optional(),
+  /** This family's own record with the win. Null for locked wins. */
+  mine: z
+    .object({ tried: z.number().int(), helped: z.number().int(), openTryId: z.string().uuid().nullable() })
+    .nullable()
+    .optional(),
 });
 export type Win = z.infer<typeof Win>;
 
@@ -561,3 +566,52 @@ export function ageBandOf(months: number): AgeBand {
   if (months < 60) return "3-5y";
   return "5y+";
 }
+
+/* ------------------------------------------------------------------ */
+/* Progress: tries and outcomes                                        */
+/* ------------------------------------------------------------------ */
+
+/** An open try older than this counts as "no answer" and drops out of progress. */
+export const OPEN_TRY_DAYS = 7;
+
+export const WinTry = z.object({
+  id: z.string().uuid(),
+  winId: z.string(),
+  winTitle: z.string(),
+  goalSlug: GoalSlug,
+  childId: z.string().uuid(),
+  outcome: WorkedOutcome.nullable(),
+  /** Set when a caregiver reported it, e.g. "Nani". */
+  reportedBy: z.string().nullable(),
+  createdAt: z.string(),
+  reportedAt: z.string().nullable(),
+});
+export type WinTry = z.infer<typeof WinTry>;
+
+export const StartTry = z.object({ winId: z.string(), childId: z.string().uuid().optional() });
+export type StartTry = z.infer<typeof StartTry>;
+
+export const ReportOutcome = z.object({ outcome: WorkedOutcome, text: z.string().trim().min(3).max(1000).optional() });
+export type ReportOutcome = z.infer<typeof ReportOutcome>;
+
+export const ReportOutcomeResponse = z.object({ try: WinTry, moment: CreateMomentResponse.nullable() });
+export type ReportOutcomeResponse = z.infer<typeof ReportOutcomeResponse>;
+
+const OutcomeCounts = z.object({
+  tried: z.number().int(),
+  helped: z.number().int(),
+  somewhat: z.number().int(),
+  didnt: z.number().int(),
+});
+
+export const GoalProgress = OutcomeCounts.extend({
+  goalSlug: GoalSlug,
+  goalTitle: z.string(),
+  /** The last reported outcomes, oldest first. */
+  recent: z.array(WorkedOutcome),
+  wins: z.array(OutcomeCounts.extend({ winId: z.string(), title: z.string(), position: z.number().int() })),
+});
+export type GoalProgress = z.infer<typeof GoalProgress>;
+
+export const ProgressResponse = z.object({ goals: z.array(GoalProgress), openTries: z.array(WinTry) });
+export type ProgressResponse = z.infer<typeof ProgressResponse>;

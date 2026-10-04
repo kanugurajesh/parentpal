@@ -14,6 +14,7 @@ import { env } from "../env";
 import { badRequest, HttpError, notFound } from "../lib/errors";
 import { iso } from "../lib/serialize";
 import { isSubscribed } from "./entitlement";
+import { recordCaregiverTry } from "./progress";
 import { createMoment } from "./story";
 
 /**
@@ -214,8 +215,16 @@ export async function openPublicPlaybook(token: string): Promise<PublicPlaybook>
 
 export const QUICK_PREFIX = { worked: "It worked", tough: "It was a tough one" } as const;
 
-export async function caregiverLog(token: string, input: { quick?: keyof typeof QUICK_PREFIX; text?: string }): Promise<{ ok: true; safety: SafetyNotice | null }> {
+/** "It worked" and "It was tough" about a named win also count toward the parent's progress. */
+const QUICK_OUTCOME = { worked: "helped", tough: "didnt" } as const;
+
+export async function caregiverLog(
+  token: string,
+  input: { quick?: keyof typeof QUICK_PREFIX; text?: string; winId?: string },
+): Promise<{ ok: true; safety: SafetyNotice | null }> {
   const { caregiver, child, user } = await byToken(token);
+  const win = input.winId ? (await sharedWins(user.id)).find((w) => w.id === input.winId) : undefined;
+  if (input.winId && !win) throw badRequest("That idea isn't shared any more.");
   const note = input.text?.trim() ?? "";
   const text = input.quick ? (note ? `${QUICK_PREFIX[input.quick]}: ${note}` : `${QUICK_PREFIX[input.quick]}.`) : note;
   if (text.length < 3) throw badRequest("Tap how it went, or write a few words.");
@@ -228,5 +237,16 @@ export async function caregiverLog(token: string, input: { quick?: keyof typeof 
   if (n >= LOGS_PER_DAY) throw new HttpError(429, "That's a lot of notes for one day. Thank you! Try again tomorrow.");
 
   const res = await createMoment(user.id, child, text, { surface: "caregiver", caregiverId: caregiver.id, loggedBy: caregiver.name });
+  if (win && input.quick) {
+    await recordCaregiverTry({
+      userId: user.id,
+      childId: child.id,
+      winId: win.id,
+      goalSlug: win.goalSlug,
+      outcome: QUICK_OUTCOME[input.quick],
+      caregiverId: caregiver.id,
+      momentId: res.moment.id,
+    });
+  }
   return { ok: true, safety: res.safety };
 }

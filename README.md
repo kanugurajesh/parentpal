@@ -32,6 +32,7 @@ The first version of ParentPal follows the original product: goals and wins, an 
 | 2 | [**Family Playbook**](#2-family-playbook-share-the-plan-with-every-caregiver) | Share the plan and the exact words with grandparents, a nanny or a teacher on a no-app link; their notes flow into Story. |
 | 3 | [**Smaller improvements**](#3-smaller-improvements) | "Ask other parents" from chat, community stats on wins, reply notices in the inbox, coloured Story pebbles, and fixes. |
 | 4 | [**Quality work**](#4-quality-work-behind-these-features) | 26 new automated tests, live-model checks, and three new entries in the AI mistakes log. |
+| 5 | [**Bug-fix pass**](#5-bug-fix-pass) | A review of the whole app: paid content no longer leaks through chat, no more 500s from odd input, and screens that used to fail silently now say so. |
 
 ### 1. Circles: anonymous parent community
 
@@ -96,7 +97,7 @@ The first version of ParentPal follows the original product: goals and wins, an 
 
 **The rules**
 
-- **Entitlement:** by default the playbook shares win 1 of each of the parent's goals. Only wins the parent has unlocked can be shared (win 1 free, the rest with a subscription), up to 4 at a time.
+- **Entitlement:** until the parent chooses, the playbook shares win 1 of each of their goals. Once they've chosen, it shares exactly their choice, which can be nothing. Only wins the parent has unlocked can be shared (win 1 free, the rest with a subscription), up to 4 at a time.
 - **Links:**
   - Each link is a 32-byte random token and works until the parent stops sharing; it then shows "Link turned off".
   - Up to 5 people per family.
@@ -135,6 +136,50 @@ The first version of ParentPal follows the original product: goals and wins, an 
   - A moderation rule that would have blocked parents venting about themselves.
   - Three regex slips, found by tests.
 - **Existing evals:** `npm run eval` still produces the same results as before these features.
+
+### 5. Bug-fix pass
+
+A review of the API and the mobile app turned up a set of real bugs, all fixed. 7 new tests cover the API side (84 tests in total, all passing).
+
+**Behaviour changes**
+
+| Change | What it means |
+|---|---|
+| **Locked wins stay locked in chat** | Retrieval now only returns win 1 and goal overviews to free users, so Ask can't quote a paid win's script. Circles guide replies are public, so they only ever use free content. Subscribers get everything, as before. |
+| **Clearing the playbook shares nothing** | Before, unselecting every win made caregiver links fall back to win 1 of each goal. Now that fallback applies only until the parent first chooses (`users.playbook_chosen_at`, migration `0004_playbook_chosen.sql`). |
+| **Production refuses dev secrets** | With `NODE_ENV=production`, the API won't start while `JWT_SECRET` or `ADMIN_KEY` is still the public dev default. The admin key is compared in constant time. |
+
+**API fixes**
+
+| Bug | Fix |
+|---|---|
+| An empty `PATCH /me` or `PATCH /children/:id` returned 500 | Treated as a no-op that returns the current row (404 if the child isn't yours). |
+| `?today=2026-02-30` returned 500 from Postgres | Dates must be real calendar dates; impossible ones get a 400. |
+| Marking an older Circles notice read returned an empty 500 | `markNoticeRead` returns the notice itself instead of searching the newest 30. |
+| "Load more" in a circle could skip posts | The feed cursor is now `<timestamp>\|<id>`, compared at millisecond precision with the id as tiebreak, because Postgres stores microseconds and JS dates don't. |
+| Two registrations racing for one email returned 500 | The unique-index error becomes a 409. |
+| A chat closed mid-answer kept generating and wasn't costed | Disconnects are detected on the response socket, and an unfinished stream is logged to `llm_calls` with estimated tokens. |
+| Approving a reply held for review sent no notice | The post's author now gets the same inbox notice a live reply would have sent. |
+| The birth-year check was fixed at server start | "This year" is read on every request; a birth month later this year is rejected. |
+
+**Mobile fixes**
+
+| Bug | Fix |
+|---|---|
+| Wins stayed locked after subscribing (and unlocked after cancelling) | Checkout and cancel refresh every cached query, not just `/me`. |
+| "Add moment" opened from a notification at launch could never be saved | The selected child is derived from the profile once it loads, instead of frozen as empty. |
+| Story said "4 down, -1 to go"; Home promised a pattern that didn't exist | Both show "keep logging" once there are 3+ moments with no pattern; Home checks for a real pattern. |
+| Silent failures | Error notes, with retry where it helps, for: circles failing to load (feed and composer), deleting a post or reply, removing a caregiver, deleting a moment (now confirmed first), and the profile failing to load. Failed queries also retry when the app returns to the foreground. |
+| "Turn on" in Notifications left phone alerts off | It now turns phone alerts back on too, as Settings does, and reschedules straight away. |
+| "I'll try this" promised a check-in with notifications off | It offers to turn notifications back on first. |
+| "Ask about X" stacked a second tab bar | Uses `router.navigate` instead of `push`. |
+| Switching accounts kept the previous profile's alerts | Signing in as a different user clears them; a guest creating an account keeps theirs. |
+| A gateway or ngrok HTML error showed a JSON parse error | Shown as a readable "Request failed (status)"; chat network failures show "Can't reach the server". |
+| Retrying "Create my plan" created a second guest account | Onboarding resumes from the step that failed. |
+| iOS birth-date picker showed a date that didn't count as chosen | The date shown is now the date selected. |
+| Sign-in opened in login mode before the profile loaded | It switches to "create account" once it knows you're a guest. |
+
+**Not done yet** (known, lower priority): rate limits on guest creation, chat and moments; count-then-insert races on child, caregiver and note limits; login timing; reactions and reports left behind when a post is deleted; keyboard offsets in chat; a fallback for browsers without a month picker.
 
 ## Feature brief: Circles
 
@@ -234,7 +279,7 @@ Every goal guide in ParentPal repeats the same point: **consistency** is what ma
 
 ### How it works for the parent
 
-1. **Pick what to share.** On a win, tap **Send to family**, or open *Family playbook* from Home or Profile. By default it shares win 1 of each of your goals, up to 4 wins. Fewer is easier to stick to.
+1. **Pick what to share.** On a win, tap **Send to family**, or open *Family playbook* from Home or Profile. Until you choose, it shares win 1 of each of your goals. You can share up to 4 wins, or none. Fewer is easier to stick to.
 2. **Add a person.** Type what your child calls them ("Nani", "Papa", "Aunty Meena") and pick a relationship. Tap **Create link and share**. The phone's share sheet opens with a warm, ready-to-send WhatsApp message and the private link.
 3. **See that it's working.** Each person shows "Opened 2h ago · 3 notes". Their notes appear in Story as **"Logged by Nani"** and count towards the 3 moments needed for a pattern.
 4. **Stay in control.** Remove a person and their link stops working at once. Notes they already sent stay in the journal.
@@ -351,7 +396,7 @@ Requests flow **route → service → db / llm**:
 ### How the chat answers a message
 
 1. **Safety gate:** regex/phrase rules per category. A match returns a fixed safety message and logs a `safety_events` row that stores the category only, never the text. The LLM is not called.
-2. **Retrieve:** Postgres full-text search over content chunks, top 3, boosted for the user's active goals. Chunks below a minimum score are never shown to the model or cited.
+2. **Retrieve:** Postgres full-text search over content chunks, top 3, boosted for the user's active goals. Chunks below a minimum score are never shown to the model or cited. Free users only get win 1 and goal overviews, so the chat can't quote a locked win.
 3. **Clarify:** if the question is short or generic *and* retrieval confidence is low, the API asks one clarifying question with 2–3 options instead of answering.
 4. **Answer:** a system prompt plus child context plus retrieved chunks, streamed back over SSE. The server checks that every citation id the model gives was actually retrieved and drops any that weren't.
 5. **Log:** provider, model, purpose, tokens, latency and cost go to `llm_calls`. Prompts and outputs are not stored.
@@ -442,7 +487,7 @@ Three reports from different parents hide an item until a moderator decides; onc
 
 - **Data:**
   - `caregivers` holds the name, relation, a random token, `revokedAt` and `lastOpenedAt`.
-  - `playbook_wins` holds the parent's chosen wins.
+  - `playbook_wins` holds the parent's chosen wins. `users.playbook_chosen_at` records that they have chosen, so an empty choice shares nothing instead of the win-1 defaults.
   - `moments.caregiverId` and `moments.loggedBy` record who logged a moment. The name is a snapshot, so it survives removing the caregiver.
 - **Entitlement:** only wins the parent can see can be shared (win 1, or any win with a subscription). If a subscription lapses, locked wins drop out of the page.
 - **One moment pipeline:** `createMoment()` in `services/story.ts` is used by both the parent's Story and the caregiver page. It runs the safety check, then LLM tagging, then the pattern check, so caregiver notes behave exactly like the parent's.
@@ -501,8 +546,8 @@ To test on a physical phone, the app needs a URL for the API that the phone can 
 |---|---|---|
 | `PORT` | `4000` | API port |
 | `DATABASE_URL` / `TEST_DATABASE_URL` | local docker DBs on `5433` | Postgres connections (the test DB is created by `apps/api/db-init`) |
-| `JWT_SECRET` | dev placeholder | Signs auth tokens. **Change it.** |
-| `ADMIN_KEY` | `dev-admin-key` | Required as the `x-admin-key` header on `/v1/admin/*` and `/v1/dev/*` |
+| `JWT_SECRET` | dev placeholder | Signs auth tokens. **Change it.** The API won't start in production with the default. |
+| `ADMIN_KEY` | `dev-admin-key` | Required as the `x-admin-key` header on `/v1/admin/*` and `/v1/dev/*`. The API won't start in production with the default. |
 | `LLM_PROVIDER` | auto | `groq`, `openai` or `mock`. Auto-selects `groq`, then `openai`, by which key is present. |
 | `GROQ_API_KEY`, `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq config |
 | `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | `gpt-4o-mini` | OpenAI or any OpenAI-compatible endpoint |
@@ -541,7 +586,7 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Chat:** `GET /chat`, `DELETE /chat` (starts a fresh conversation; bookmarked replies are kept), `GET /chat/starters`, `GET /chat/topics`, `POST /chat/messages` (SSE: `meta` → `delta`* → `done`), feedback and bookmark routes, `GET /bookmarks`
 - **Notifications:** `GET /notifications?today=YYYY-MM-DD` (inbox; hides tips dated after the device's today), `GET /notifications/upcoming?from=YYYY-MM-DD&days=1-3` (creates and returns the next days' tips for on-device scheduling; `from` must be within a day of the server's date), `POST /notifications/:id/read`
 - **Family playbook:** `GET /playbook`, `PUT /playbook/wins`, `POST /caregivers` (returns the link and a ready-to-send message), `DELETE /caregivers/:id` (turns the link off). Public, no auth: `GET /p/:token` (HTML page), `POST /p/:token/log`.
-- **Circles:** `GET /circles`, `GET|POST /circles/:goal/posts` (`?band=2-3y|all&cursor=`), `GET|DELETE /posts/:id`, `POST /posts/:id/replies`, `DELETE /replies/:id`, `POST /reactions` (toggles), `POST /reports`, `POST /blocks`. Writes need a signed-up account.
+- **Circles:** `GET /circles`, `GET|POST /circles/:goal/posts` (`?band=2-3y|all&cursor=`, where `cursor` is the previous page's opaque `nextCursor`), `GET|DELETE /posts/:id`, `POST /posts/:id/replies`, `DELETE /replies/:id`, `POST /reactions` (toggles), `POST /reports`, `POST /blocks`. Writes need a signed-up account.
 - **Ops** (needs `x-admin-key`): `GET /admin/costs?days=30` (LLM cost and latency breakdown), `POST /dev/run-daily-tips`, `GET /admin/community/queue`, `POST /admin/community/:type/:id` (`approve` or `remove`)
 
 `GET /health` (no auth) reports which LLM provider is active.
@@ -584,6 +629,7 @@ Seven goals exist. Three have full content: **handling tantrums**, **fixing slee
 - **Notifications are on-device only, and not available in Android Expo Go.** Testing them on Android needs a development build. They pause if the app isn't opened for about 3 days, and there's no measurement yet of how often a check-in leads to a logged moment.
 - **Single instance.** The daily tip cron runs in-process.
 - **Circles moderation has no admin UI yet.** The review queue is a JSON endpoint. Before launch, someone has to own that queue every day. There are no push alerts for replies, only the inbox.
+- **No request rate limits** on guest creation, chat or moments, so a script could run up LLM costs. Circles has its own daily limits.
 - One running conversation per user. No password reset or social sign-in.
 
 ## More docs

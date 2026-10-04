@@ -50,7 +50,8 @@ button{font:inherit;font-weight:700;border-radius:999px;min-height:52px;padding:
 button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
 button.primary{background:var(--moss);border-color:var(--moss);color:#fff;width:100%;margin-top:12px}
 button:disabled{opacity:.5}
-textarea{width:100%;min-height:96px;font:inherit;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff;color:var(--ink);resize:vertical}
+textarea,select{width:100%;min-height:96px;font:inherit;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff;color:var(--ink);resize:vertical}
+select{min-height:0;margin-bottom:12px}
 .notice{border-radius:14px;padding:14px 16px;margin-top:12px}
 .ok{background:var(--mossTint)}
 .err{background:var(--dangerTint);color:var(--danger)}
@@ -93,6 +94,14 @@ ${wins}
 <section class="log" aria-labelledby="log-title">
   <h2 id="log-title">How did it go with ${child}?</h2>
   <p class="muted">Your note goes straight to ${esc(p.from)}'s journal in ParentPal. One line is plenty.</p>
+${
+  p.wins.length > 1
+    ? `<label for="win" class="muted">Which idea? (optional)</label>
+  <select id="win"><option value="">Not sure / something else</option>${p.wins.map((w) => `<option value="${esc(w.id)}">${esc(w.title)}</option>`).join("")}</select>`
+    : p.wins.length === 1
+      ? `<input type="hidden" id="win" value="${esc(p.wins[0].id)}">`
+      : ""
+}
   <div class="row" role="group" aria-label="How did it go">
     <button type="button" data-quick="worked" aria-pressed="false">It worked</button>
     <button type="button" data-quick="tough" aria-pressed="false">It was tough</button>
@@ -105,7 +114,7 @@ ${wins}
 <footer>General guidance from public pediatric and health sources, not medical advice.<br>Shared privately with ParentPal. Please don't forward this link.</footer>
 <script>
 (function(){
-  var quick=null, btns=document.querySelectorAll('[data-quick]'), send=document.getElementById('send'), out=document.getElementById('result');
+  var win=document.getElementById('win'), quick=null, btns=document.querySelectorAll('[data-quick]'), send=document.getElementById('send'), out=document.getElementById('result');
   btns.forEach(function(b){b.addEventListener('click',function(){quick=b.getAttribute('aria-pressed')==='true'?null:b.dataset.quick;btns.forEach(function(x){x.setAttribute('aria-pressed',String(x.dataset.quick===quick))});});});
   function show(cls,html){out.innerHTML='<div class="notice '+cls+'">'+html+'</div>';}
   function text(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
@@ -113,12 +122,12 @@ ${wins}
     var note=document.getElementById('note').value.trim();
     if(!quick&&note.length<3){show('err','Tap how it went, or write a few words.');return;}
     send.disabled=true;
-    fetch(location.pathname.replace(/\\/$/,'')+'/log',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({quick:quick||undefined,text:note||undefined})})
+    fetch(location.pathname.replace(/\\/$/,'')+'/log',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({quick:quick||undefined,text:note||undefined,winId:(win&&win.value)||undefined})})
       .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
       .then(function(res){
         send.disabled=false;
         if(!res.ok){show('err',text(res.j.message||'Something went wrong. Try again.'));return;}
-        document.getElementById('note').value='';quick=null;btns.forEach(function(x){x.setAttribute('aria-pressed','false')});
+        document.getElementById('note').value='';if(win&&win.tagName==='SELECT')win.value='';quick=null;btns.forEach(function(x){x.setAttribute('aria-pressed','false')});
         var s=res.j.safety;
         if(s){show('safety','<strong>'+text(s.title)+'</strong><p>'+text(s.body)+'</p>'+s.actions.map(function(a){return '<a href="'+text(a.href)+'">'+text(a.label)+'</a>';}).join(''));return;}
         show('ok','Thank you! Your note was sent.');
@@ -150,7 +159,7 @@ export const publicPlaybookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       schema: {
         params: Token,
-        body: z.object({ quick: z.enum(["worked", "tough"]).optional(), text: z.string().max(1000).optional() }),
+        body: z.object({ quick: z.enum(["worked", "tough"]).optional(), text: z.string().max(1000).optional(), winId: z.string().max(100).optional() }),
       },
     },
     async (req) => caregiverLog(req.params.token, req.body),
