@@ -16,15 +16,8 @@ import { db, schema } from "../db/client";
 import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
 import { winCommunityStats } from "../services/community";
+import { isSubscribed } from "../services/entitlement";
 import { loadMe } from "./me";
-
-export async function isSubscribed(userId: string) {
-  const [sub] = await db
-    .select({ status: schema.subscriptions.status })
-    .from(schema.subscriptions)
-    .where(eq(schema.subscriptions.userId, userId));
-  return sub?.status === "active_fake";
-}
 
 async function sourceMap(ids: string[]) {
   if (!ids.length) return new Map<string, Source>();

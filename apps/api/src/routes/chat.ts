@@ -57,7 +57,8 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     });
     const send = (e: ChatStreamEvent) => raw.write(`data: ${JSON.stringify(e)}\n\n`);
     let closed = false;
-    req.raw.on("close", () => (closed = true));
+    // The response socket closing is what signals the client went away; the request stream has already ended.
+    raw.on("close", () => (closed = true));
     try {
       for await (const event of runChat(req.userId, req.body)) {
         if (closed) break;

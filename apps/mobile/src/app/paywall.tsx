@@ -1,5 +1,5 @@
 import type { PState } from "@/components/ui";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
@@ -21,7 +21,8 @@ const PLANS: { id: Plan; name: string; price: string; per: string; note?: string
 const PERKS = ["Every win for every goal", "Unlimited questions in Ask", "Pattern insights from your Story"];
 
 export default function Paywall() {
-  const { me, refreshMe } = useSession();
+  const { me } = useSession();
+  const qc = useQueryClient();
   const [plan, setPlan] = useState<Plan>("annual");
   const [confirming, setConfirming] = useState(false);
   const child = me?.children[0]?.nickname;
@@ -30,7 +31,9 @@ export default function Paywall() {
   const checkout = useMutation({
     mutationFn: () => api.subscribe(plan),
     onSuccess: async () => {
-      await refreshMe();
+      // Entitlement changes what goals, the playbook and more return, not just /me:
+      // refresh everything so the goal screen under this modal unlocks right away.
+      await qc.invalidateQueries();
       close();
     },
   });

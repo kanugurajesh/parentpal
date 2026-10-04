@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { MomentCard } from "@/components/MomentCard";
 import { Button, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
+import { confirm } from "@/lib/confirm";
 import { color, space } from "@/theme/tokens";
 
 export default function AllMoments() {
@@ -18,6 +19,10 @@ export default function AllMoments() {
       qc.invalidateQueries({ queryKey: ["patterns"] });
     },
   });
+  const askRemove = async (id: string) => {
+    const ok = await confirm({ title: "Delete this moment?", message: "It will be removed from your Story. This can't be undone.", confirmLabel: "Delete", cancelLabel: "Cancel", tone: "danger", icon: "trash" });
+    if (ok) remove.mutate(id);
+  };
 
   return (
     <Screen>
@@ -30,6 +35,7 @@ export default function AllMoments() {
         </T>
         {moments.isLoading ? <Loading /> : null}
         {moments.error ? <ErrorNote message={(moments.error as Error).message} onRetry={() => moments.refetch()} /> : null}
+        {remove.error ? <ErrorNote message={(remove.error as Error).message} /> : null}
         {moments.data && !moments.data.moments.length ? (
           <View style={{ gap: space.md }}>
             <T color={color.inkSoft}>No moments yet. Your first one takes less than a minute.</T>
@@ -46,7 +52,7 @@ export default function AllMoments() {
             key={m.id}
             moment={m}
             highlight={linked.has(m.id)}
-            footer={<Button label="Delete" kind="ghost" onPress={() => remove.mutate(m.id)} style={{ alignSelf: "flex-start", minHeight: 36, paddingHorizontal: 0 }} />}
+            footer={<Button label="Delete" kind="ghost" onPress={() => void askRemove(m.id)} style={{ alignSelf: "flex-start", minHeight: 36, paddingHorizontal: 0 }} />}
           />
         ))}
       </View>

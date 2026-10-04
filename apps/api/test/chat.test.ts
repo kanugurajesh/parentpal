@@ -25,12 +25,26 @@ describe("chat streaming", () => {
     expect(done.type).toBe("done");
     if (done.type !== "done") return;
     expect(done.message.kind).toBe("answer");
-    expect(done.message.citations[0]).toMatchObject({ goalSlug: "tantrums", winId: "tantrums-3" });
+    expect(done.message.citations[0]).toMatchObject({ goalSlug: "tantrums" });
     // The streamed text and the stored text match.
     const streamed = events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("");
     expect(streamed.trim()).toBe(done.message.content);
     // Uses the child's nickname from context.
     expect(done.message.content).toContain("Mo");
+  });
+
+  it("never quotes locked wins to a free user, but does once they subscribe", async () => {
+    const q = "My son screams every time we have to leave the park";
+    const g = await onboarded(app);
+    const free = (await ask(app, g.auth, q)).events.at(-1)!;
+    if (free.type !== "done") throw new Error("expected done");
+    const winIds = free.message.citations.map((c) => c.winId).filter((id): id is string => !!id);
+    expect(winIds.every((id) => id.endsWith("-1"))).toBe(true);
+
+    await app.inject({ method: "POST", url: "/v1/subscription", headers: g.auth, payload: { plan: "annual" } });
+    const paid = (await ask(app, g.auth, q)).events.at(-1)!;
+    if (paid.type !== "done") throw new Error("expected done");
+    expect(paid.message.citations[0]).toMatchObject({ goalSlug: "tantrums", winId: "tantrums-3" });
   });
 
   it("asks one clarifying question with tap options for vague input, then answers the follow-up", async () => {

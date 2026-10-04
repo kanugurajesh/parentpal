@@ -3,7 +3,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { AuthResponse, Credentials } from "@parentpal/shared";
 import { db, schema } from "../db/client";
 import { hashPassword, requireUser, verifyPassword } from "../lib/auth";
-import { HttpError } from "../lib/errors";
+import { HttpError, isUniqueViolation } from "../lib/errors";
 import { toUser } from "../lib/serialize";
 
 export const authRoutes: FastifyPluginAsyncZod = async (app) => {
@@ -24,11 +24,17 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
       if (!me.isGuest) throw new HttpError(409, "This profile already has an account.");
       const [taken] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, req.body.email));
       if (taken) throw new HttpError(409, "That email already has an account. Sign in instead.");
+      const passwordHash = await hashPassword(req.body.password);
       const [user] = await db
         .update(schema.users)
-        .set({ isGuest: false, email: req.body.email, passwordHash: await hashPassword(req.body.password) })
+        .set({ isGuest: false, email: req.body.email, passwordHash })
         .where(eq(schema.users.id, req.userId))
-        .returning();
+        .returning()
+        .catch((err: unknown) => {
+          // Two registrations racing for the same email: the unique index settles it.
+          if (isUniqueViolation(err)) throw new HttpError(409, "That email already has an account. Sign in instead.");
+          throw err;
+        });
       return { token: sign(user.id), user: toUser(user) };
     },
   );

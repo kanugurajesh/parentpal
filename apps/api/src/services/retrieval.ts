@@ -97,7 +97,8 @@ function toQuery(text: string): string | null {
 
 export async function retrieve(
   text: string,
-  opts: { boostGoals?: string[]; limit?: number } = {},
+  /** `subscribed: false` keeps locked wins (position 2+) out, so chat can't quote paid content. Defaults to all content. */
+  opts: { boostGoals?: string[]; limit?: number; subscribed?: boolean } = {},
 ): Promise<RetrievedChunk[]> {
   const q = toQuery(text);
   if (!q) return [];
@@ -128,6 +129,7 @@ export async function retrieve(
     LEFT JOIN wins w ON w.id = c.win_id
     CROSS JOIN q
     WHERE c.tsv @@ q.query
+      ${opts.subscribed === false ? sql`AND (c.win_id IS NULL OR w.position = 1)` : sql``}
     ORDER BY score DESC, c.id
     LIMIT ${opts.limit ?? 3}
   `);

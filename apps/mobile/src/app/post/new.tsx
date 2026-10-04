@@ -95,6 +95,7 @@ export default function NewPost() {
     <Screen>
       <SubHeader title="New post" />
       {circles.isLoading ? <Loading /> : null}
+      {circles.error ? <ErrorNote message={(circles.error as Error).message} onRetry={() => circles.refetch()} /> : null}
       <View style={{ gap: space.xl }}>
         {!params.goal && circles.data ? (
           <View style={{ gap: space.sm }}>

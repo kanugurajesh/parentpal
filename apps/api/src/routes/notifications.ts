@@ -9,7 +9,14 @@ import { iso } from "../lib/serialize";
 import { markNoticeRead, noticesFor } from "../services/community";
 import { addDays, todayISO, upcomingTips } from "../services/dailyTips";
 
-const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+const IsoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+  // Reject well-formed but impossible dates (2026-02-30) before Postgres does with a 500.
+  .refine((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, "Not a real date");
 
 /** Within a day of the server's date, which covers every time zone. */
 function isNearServerToday(date: string) {
@@ -91,9 +98,9 @@ export const notificationRoutes: FastifyPluginAsyncZod = async (app) => {
         .where(and(eq(schema.notifications.id, req.params.id), eq(schema.notifications.userId, req.userId)))
         .returning();
       if (n) return toNotification(n);
-      if (!(await markNoticeRead(req.userId, req.params.id))) throw notFound("Notification");
-      const notices = await noticesFor(req.userId);
-      return notices.find((x) => x.id === req.params.id)!;
+      const notice = await markNoticeRead(req.userId, req.params.id);
+      if (!notice) throw notFound("Notification");
+      return notice;
     },
   );
 };

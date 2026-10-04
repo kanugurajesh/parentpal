@@ -248,14 +248,24 @@ export async function listCircles(viewerId: string): Promise<{ circles: Circle[]
 export async function feed(viewerId: string, goalSlug: GoalSlug, opts: { band: AgeBand | "all"; cursor?: string }): Promise<FeedResponse> {
   const t = schema.communityPosts;
   const base = and(eq(t.goalSlug, goalSlug), visible(t, viewerId));
+  // Keyset cursor "<iso>|<id>". JS dates stop at milliseconds while timestamptz keeps microseconds,
+  // so compare at millisecond precision and break ties by id; otherwise posts inside that gap are skipped.
+  const ms = sql`date_trunc('milliseconds', ${t.createdAt})`;
+  let after: SQL | undefined;
+  if (opts.cursor) {
+    const [at, id] = opts.cursor.split("|");
+    const d = new Date(at).toISOString();
+    after = or(sql`${ms} < ${d}::timestamptz`, and(sql`${ms} = ${d}::timestamptz`, lt(t.id, id)));
+  }
   const rows = await db
     .select()
     .from(t)
-    .where(and(base, opts.band === "all" ? undefined : eq(t.ageBand, opts.band), opts.cursor ? lt(t.createdAt, new Date(opts.cursor)) : undefined))
-    .orderBy(desc(t.createdAt))
+    .where(and(base, opts.band === "all" ? undefined : eq(t.ageBand, opts.band), after))
+    .orderBy(desc(ms), desc(t.id))
     .limit(LIMITS.feedPage + 1);
   const page = rows.slice(0, LIMITS.feedPage);
-  const nextCursor = rows.length > LIMITS.feedPage ? iso(page[page.length - 1].createdAt) : null;
+  const last = page[page.length - 1];
+  const nextCursor = rows.length > LIMITS.feedPage ? `${iso(last.createdAt)}|${last.id}` : null;
 
   // Cold start: a quiet age band borrows from its neighbours instead of looking empty.
   let nearby: PostRow[] = [];
@@ -481,41 +491,52 @@ export async function deleteOwn(viewerId: string, type: TargetType, id: string) 
 /* Inbox notices                                                       */
 /* ------------------------------------------------------------------ */
 
-export async function noticesFor(userId: string, today?: string): Promise<Notification[]> {
+function selectNotices() {
   const n = schema.communityNotices;
-  const rows = await db
+  return db
     .select({ notice: n, goalSlug: schema.communityPosts.goalSlug, body: schema.communityPosts.body })
     .from(n)
-    .innerJoin(schema.communityPosts, eq(schema.communityPosts.id, n.postId))
+    .innerJoin(schema.communityPosts, eq(schema.communityPosts.id, n.postId));
+}
+
+export async function noticesFor(userId: string, today?: string): Promise<Notification[]> {
+  const n = schema.communityNotices;
+  const rows = await selectNotices()
     .where(and(eq(n.userId, userId), today ? sql`${n.forDate} <= ${today}` : undefined))
     .orderBy(desc(n.forDate), desc(n.createdAt))
     .limit(30);
-  return rows.map(({ notice, goalSlug, body }) => {
-    const others = notice.count - (notice.guideReplied ? 1 : 0);
-    const title =
-      others === 0
-        ? "ParentPal's guide answered your question"
-        : `${others} new ${others === 1 ? "reply" : "replies"} to your post${notice.guideReplied ? ", plus a guide answer" : ""}`;
-    return {
-      id: notice.id,
-      title,
-      body: body.length > 90 ? `"${body.slice(0, 87).trimEnd()}…"` : `"${body}"`,
-      goalSlug: goalSlug as GoalSlug,
-      forDate: notice.forDate,
-      readAt: notice.readAt ? iso(notice.readAt) : null,
-      createdAt: iso(notice.createdAt),
-      postId: notice.postId,
-    };
-  });
+  return rows.map(toNotice);
 }
 
-export async function markNoticeRead(userId: string, id: string) {
+function toNotice({ notice, goalSlug, body }: Awaited<ReturnType<typeof selectNotices>>[number]): Notification {
+  const others = notice.count - (notice.guideReplied ? 1 : 0);
+  const title =
+    others === 0
+      ? "ParentPal's guide answered your question"
+      : `${others} new ${others === 1 ? "reply" : "replies"} to your post${notice.guideReplied ? ", plus a guide answer" : ""}`;
+  return {
+    id: notice.id,
+    title,
+    body: body.length > 90 ? `"${body.slice(0, 87).trimEnd()}…"` : `"${body}"`,
+    goalSlug: goalSlug as GoalSlug,
+    forDate: notice.forDate,
+    readAt: notice.readAt ? iso(notice.readAt) : null,
+    createdAt: iso(notice.createdAt),
+    postId: notice.postId,
+  };
+}
+
+/** Marks one of the user's notices read and returns it, or null if it isn't theirs. */
+export async function markNoticeRead(userId: string, id: string): Promise<Notification | null> {
+  const n = schema.communityNotices;
   const [row] = await db
-    .update(schema.communityNotices)
+    .update(n)
     .set({ readAt: new Date() })
-    .where(and(eq(schema.communityNotices.id, id), eq(schema.communityNotices.userId, userId)))
-    .returning({ id: schema.communityNotices.id });
-  return !!row;
+    .where(and(eq(n.id, id), eq(n.userId, userId)))
+    .returning({ id: n.id });
+  if (!row) return null;
+  const [notice] = await selectNotices().where(eq(n.id, id));
+  return notice ? toNotice(notice) : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -541,6 +562,7 @@ export async function moderationQueue() {
 
 export async function moderateItem(type: TargetType, id: string, action: "approve" | "remove") {
   const table = type === "post" ? schema.communityPosts : schema.communityReplies;
+  const [before] = await db.select({ status: table.status }).from(table).where(eq(table.id, id));
   const [row] = await db
     .update(table)
     .set(action === "approve" ? { status: "live", approvedAt: new Date() } : { status: "removed" })
@@ -548,5 +570,11 @@ export async function moderateItem(type: TargetType, id: string, action: "approv
     .returning();
   if (!row) throw notFound(type === "post" ? "Post" : "Reply");
   if (action === "approve" && type === "post") queueGuideReply(row as PostRow);
+  // A reply held for review notifies the post's author once it goes live, as a live reply would have.
+  if (action === "approve" && type === "reply" && before?.status !== "live") {
+    const reply = row as typeof schema.communityReplies.$inferSelect;
+    const [post] = await db.select({ id: schema.communityPosts.id, userId: schema.communityPosts.userId }).from(schema.communityPosts).where(eq(schema.communityPosts.id, reply.postId));
+    if (post?.userId && post.userId !== reply.userId) await bumpNotice(post.userId, post.id, reply.isGuide);
+  }
   return { id: row.id, status: row.status };
 }

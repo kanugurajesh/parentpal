@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthResponse, Me } from "@parentpal/shared";
 import { api, ApiError, setToken } from "./api";
-import { clearScheduledNotifications } from "./notifications";
+import { clearScheduledNotifications, syncNotifications } from "./notifications";
 import { storage } from "./storage";
 
 const TOKEN_KEY = "parentpal.token";
@@ -12,6 +12,8 @@ interface SessionValue {
   hasSession: boolean;
   me: Me | undefined;
   meLoading: boolean;
+  /** Set when /me failed for a reason other than an expired session (401 signs out instead). */
+  meError: Error | null;
   signIn: (auth: AuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<unknown>;
@@ -54,12 +56,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (auth: AuthResponse) => {
+      // Switching to a different profile (e.g. guest → existing account): the previous profile's alerts
+      // must not fire. Registering a guest keeps the same user, so their check-ins stay.
+      const currentId = qc.getQueryData<Me>(["me"])?.user.id;
+      const switching = hasSession && currentId !== auth.user.id;
+      if (switching) await clearScheduledNotifications().catch(() => {});
       await storage.set(TOKEN_KEY, auth.token);
       setToken(auth.token);
       qc.clear();
       setHasSession(true);
+      // The sync hook only re-runs when the session starts, so reschedule for the new profile here.
+      if (switching) void syncNotifications();
     },
-    [qc],
+    [qc, hasSession],
   );
 
   const value = useMemo<SessionValue>(
@@ -68,11 +77,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       hasSession,
       me: meQuery.data,
       meLoading: meQuery.isLoading,
+      meError: meQuery.error instanceof ApiError && meQuery.error.status === 401 ? null : meQuery.error,
       signIn,
       signOut,
       refreshMe: () => qc.invalidateQueries({ queryKey: ["me"] }),
     }),
-    [ready, hasSession, meQuery.data, meQuery.isLoading, signIn, signOut, qc],
+    [ready, hasSession, meQuery.data, meQuery.isLoading, meQuery.error, signIn, signOut, qc],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

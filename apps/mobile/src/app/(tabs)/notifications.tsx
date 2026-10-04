@@ -20,7 +20,9 @@ const PRIMER_POINTS = [
 function TurnedOffCard() {
   const qc = useQueryClient();
   const { refreshMe } = useSession();
+  const { prefs } = useNotificationState();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
     <View style={{ backgroundColor: color.paperDeep, borderRadius: radius.card, padding: space.xl, gap: space.md }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
@@ -38,14 +40,20 @@ function TurnedOffCard() {
         loading={busy}
         onPress={async () => {
           setBusy(true);
+          setError(null);
           try {
             await setAccountNotifications(true);
             await Promise.all([refreshMe(), qc.invalidateQueries({ queryKey: ["notifications"] })]);
+            // Turning the account switch off also turned phone alerts off; bring them back too (as Settings does).
+            if (NOTIFICATIONS_SUPPORTED && !prefs.enabled) await turnOnNotifications();
+          } catch (e) {
+            setError((e as Error).message);
           } finally {
             setBusy(false);
           }
         }}
       />
+      {error ? <ErrorNote message={error} /> : null}
     </View>
   );
 }

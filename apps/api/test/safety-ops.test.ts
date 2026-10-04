@@ -137,6 +137,12 @@ describe("daily tips job", () => {
     expect(again.notifications.map((n: { id: string }) => n.id)).toEqual([first.notifications[0].id]);
   });
 
+  it("rejects an impossible date with 400, not a database error", async () => {
+    const g = await onboarded(app, ["sleep"]);
+    expect((await app.inject({ method: "GET", url: "/v1/notifications?today=2026-02-30", headers: g.auth })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/v1/notifications/upcoming?from=2026-13-01", headers: g.auth })).statusCode).toBe(400);
+  });
+
   it("creates no tips while the user has notifications turned off", async () => {
     const g = await onboarded(app, ["sleep"]);
     const off = await app.inject({ method: "PATCH", url: "/v1/me", headers: g.auth, payload: { notificationsEnabled: false } });

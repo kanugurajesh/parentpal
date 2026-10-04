@@ -62,11 +62,12 @@ function ToggleRow({
 
 function NotificationSettings() {
   const qc = useQueryClient();
-  const { me, refreshMe } = useSession();
+  const { me, meError, refreshMe } = useSession();
   const { prefs, loaded } = useNotificationState();
   // Shown while the server saves, so the switch responds instantly.
   const [pending, setPending] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  if (!me && meError) return <ErrorNote message={meError.message} onRetry={() => void refreshMe()} />;
   if (!loaded || !me) return null;
   const accountOn = pending ?? me.user.notificationsEnabled;
 

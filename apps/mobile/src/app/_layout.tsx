@@ -8,12 +8,13 @@ import {
   BricolageGrotesque_700Bold,
   BricolageGrotesque_800ExtraBold,
 } from "@expo-google-fonts/bricolage-grotesque";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DialogHost } from "@/lib/confirm";
@@ -24,8 +25,23 @@ import { color } from "@/theme/tokens";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 installWebStyles();
 
+/**
+ * Focus refetching is off (it would reload screens mid-use), but a query that failed, e.g. /me at
+ * launch while offline, would then stay failed forever. Retry just the failed ones on foreground.
+ */
+function useRetryFailedOnForeground() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void qc.refetchQueries({ predicate: (q) => q.state.status === "error" });
+    });
+    return () => sub.remove();
+  }, [qc]);
+}
+
 function Root() {
   const { ready } = useSession();
+  useRetryFailedOnForeground();
   const [fontsLoaded, fontError] = useFonts({
     AtkinsonHyperlegible_400Regular,
     AtkinsonHyperlegible_400Regular_Italic,

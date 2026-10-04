@@ -14,7 +14,7 @@ import { color, space } from "@/theme/tokens";
 /** Change the goals picked in onboarding. Wins, the Family playbook and daily ideas all follow these. */
 export default function EditGoals() {
   const qc = useQueryClient();
-  const { me } = useSession();
+  const { me, meError, refreshMe } = useSession();
   const [picked, setPicked] = useState<GoalSlug[] | null>(null);
 
   // Start from the saved goals once they've loaded.
@@ -39,7 +39,9 @@ export default function EditGoals() {
   return (
     <Screen>
       <SubHeader title="Your goals" />
-      {!picked ? (
+      {!picked && meError ? (
+        <ErrorNote message={meError.message} onRetry={() => void refreshMe()} />
+      ) : !picked ? (
         <Loading />
       ) : (
         <View style={{ gap: space.lg }}>

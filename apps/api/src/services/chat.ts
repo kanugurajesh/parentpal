@@ -12,6 +12,7 @@ import { db, schema } from "../db/client";
 import { llm } from "../llm";
 import { iso } from "../lib/serialize";
 import { describeFamily, loadFamilyContext, type FamilyContext } from "./context";
+import { isSubscribed } from "./entitlement";
 import { retrieve, toCitation, type RetrievedChunk } from "./retrieval";
 import { checkSafety } from "./safety";
 
@@ -238,7 +239,8 @@ export async function answerOnce(
 ): Promise<{ text: string; citations: Citation[] } | null> {
   if (checkSafety(question)) return null;
   // An unprompted public answer needs a stronger match than chat: confident, and from this circle's own goal.
-  const chunks = await retrieve(question, { boostGoals: [opts.goalSlug], limit: 3 });
+  // Public replies only ever draw on free content (win 1 and goal overviews).
+  const chunks = await retrieve(question, { boostGoals: [opts.goalSlug], limit: 3, subscribed: false });
   if ((chunks[0]?.score ?? 0) < CONFIDENT_SCORE) return null;
   const usable = chunks.filter((c) => c.goalSlug === opts.goalSlug && c.score >= MIN_CITABLE_SCORE);
   if (!usable.length) return null;
@@ -308,7 +310,7 @@ export async function* runChat(
   }
 
   const ctx = await loadFamilyContext(userId);
-  const chunks = await retrieve(query, { boostGoals: ctx.goals.map((g) => g.slug), limit: 3 });
+  const chunks = await retrieve(query, { boostGoals: ctx.goals.map((g) => g.slug), limit: 3, subscribed: await isSubscribed(userId) });
   const topScore = chunks[0]?.score ?? 0;
   const wordCount = input.text.split(/\s+/).filter(Boolean).length;
 

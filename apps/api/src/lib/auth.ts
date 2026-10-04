@@ -49,5 +49,8 @@ export async function requireUser(req: FastifyRequest) {
 }
 
 export async function requireAdmin(req: FastifyRequest, _reply: FastifyReply) {
-  if (req.headers["x-admin-key"] !== env.ADMIN_KEY) throw new HttpError(403, "Admin key required.");
+  const given = req.headers["x-admin-key"];
+  const a = Buffer.from(typeof given === "string" ? given : "");
+  const b = Buffer.from(env.ADMIN_KEY);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(403, "Admin key required.");
 }

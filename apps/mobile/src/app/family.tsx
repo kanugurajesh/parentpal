@@ -90,8 +90,13 @@ export default function Family() {
       icon: "trash",
     });
     if (!ok) return;
-    await api.revokeCaregiver(c.id);
-    await qc.invalidateQueries({ queryKey: ["playbook"] });
+    setError(null);
+    try {
+      await api.revokeCaregiver(c.id);
+      await qc.invalidateQueries({ queryKey: ["playbook"] });
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   return (

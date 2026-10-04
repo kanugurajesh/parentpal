@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { View } from "react-native";
 import { SubHeader } from "@/components/SubHeader";
@@ -11,10 +11,12 @@ const PLAN_NAME = { weekly: "Weekly", semiannual: "6 months", annual: "Annual" }
 
 /** Stub: real billing would hand off to the App Store / Play Store subscription settings. */
 export default function Subscription() {
-  const { me, refreshMe } = useSession();
+  const { me } = useSession();
+  const qc = useQueryClient();
   const sub = me?.subscription;
   const active = sub?.status === "active_fake";
-  const cancel = useMutation({ mutationFn: api.cancelSubscription, onSuccess: () => refreshMe() });
+  // Re-lock paid content everywhere it's cached, not just /me.
+  const cancel = useMutation({ mutationFn: api.cancelSubscription, onSuccess: () => qc.invalidateQueries() });
 
   return (
     <Screen>

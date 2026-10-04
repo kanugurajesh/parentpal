@@ -29,6 +29,13 @@
       "when": 1791036029463,
       "tag": "0003_family_playbook",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791085777494,
+      "tag": "0004_playbook_chosen",
+      "breakpoints": true
     }
   ]
 }

@@ -52,6 +52,8 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   /** Daily ideas and reminders. Off: no new tips are created and the app cancels phone alerts. */
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
+  /** Set once the parent picks Family Playbook wins; until then the playbook shares win 1 of each goal. */
+  playbookChosenAt: timestamp("playbook_chosen_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
 

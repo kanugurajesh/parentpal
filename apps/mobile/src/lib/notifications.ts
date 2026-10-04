@@ -168,6 +168,8 @@ export async function turnOnNotifications(explain?: ConfirmOptions): Promise<boo
 export async function setAccountNotifications(on: boolean) {
   await api.updateMe({ notificationsEnabled: on });
   if (!on) await updatePrefs({ enabled: false });
+  // Alerts cancelled while it was off come back now, not on the next foreground.
+  else void syncNotifications();
 }
 
 export async function hasPermission() {

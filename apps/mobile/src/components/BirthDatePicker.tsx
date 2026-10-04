@@ -1,4 +1,5 @@
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
+import { useEffect } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { color, radius, space } from "@/theme/tokens";
 import { Icon } from "./Icon";
@@ -21,6 +22,13 @@ export function BirthDatePicker({ value, onChange, label }: { value: MonthYear |
   const min = new Date(max.getFullYear() - 12, 0, 1);
   const date = value ? new Date(value.year, value.month - 1, 15) : new Date(max.getFullYear() - 2, max.getMonth(), 15);
   const set = (d?: Date) => d && onChange({ month: d.getMonth() + 1, year: d.getFullYear() });
+
+  // iOS's compact picker always shows a date, so make the shown date the chosen one; otherwise a
+  // parent whose child really was born then can't continue without changing it and back.
+  useEffect(() => {
+    if (Platform.OS === "ios" && !value) set(date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   if (Platform.OS === "ios") {
     return (

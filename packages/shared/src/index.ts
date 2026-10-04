@@ -89,15 +89,30 @@ export const Child = z.object({
 });
 export type Child = z.infer<typeof Child>;
 
-const thisYear = new Date().getFullYear();
-export const CreateChild = z.object({
+// "Now" is read on every validation, not at module load, so a long-running server accepts
+// babies born after New Year without a restart.
+const ChildFields = z.object({
   nickname: z.string().trim().min(1).max(30),
   sex: ChildSex,
   birthMonth: z.number().int().min(1).max(12),
-  birthYear: z.number().int().min(thisYear - 18).max(thisYear),
+  birthYear: z
+    .number()
+    .int()
+    .refine((y) => {
+      const now = new Date().getFullYear();
+      return y >= now - 18 && y <= now;
+    }, "Birth year must be within the last 18 years"),
 });
+function notInFuture(c: { birthMonth?: number; birthYear?: number }, ctx: z.RefinementCtx) {
+  if (c.birthMonth === undefined || c.birthYear === undefined) return;
+  const now = new Date();
+  if (c.birthYear === now.getFullYear() && c.birthMonth > now.getMonth() + 1) {
+    ctx.addIssue({ code: "custom", path: ["birthMonth"], message: "Birth month can't be in the future" });
+  }
+}
+export const CreateChild = ChildFields.superRefine(notInFuture);
 export type CreateChild = z.infer<typeof CreateChild>;
-export const UpdateChild = CreateChild.partial();
+export const UpdateChild = ChildFields.partial().superRefine(notInFuture);
 
 export const Me = z.object({
   user: User,

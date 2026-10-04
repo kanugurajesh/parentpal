@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import { OnboardingFrame } from "@/components/OnboardingFrame";
 import { Button, Chip, ErrorNote, Field, T } from "@/components/ui";
@@ -14,16 +14,21 @@ export default function ParentStep() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = !!draft.parentRole && draft.firstName.trim().length > 0;
+  // What already succeeded, so "Try again" resumes instead of creating a second guest profile.
+  const done = useRef({ guest: false, children: 0 });
 
   /** The only network moment in onboarding: create the guest profile and everything in it. */
   async function createPlan() {
     setBusy(true);
     setError(null);
     try {
-      const auth = await api.guest();
-      await signIn(auth);
-      for (const c of draft.children) {
+      if (!done.current.guest) {
+        await signIn(await api.guest());
+        done.current.guest = true;
+      }
+      for (const c of draft.children.slice(done.current.children)) {
         await api.addChild({ nickname: c.nickname.trim(), sex: c.sex!, birthMonth: c.birth!.month, birthYear: c.birth!.year });
+        done.current.children++;
       }
       await api.setGoals(draft.goals);
       await api.updateMe({ parentRole: draft.parentRole!, firstName: draft.firstName.trim() });

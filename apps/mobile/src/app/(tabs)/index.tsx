@@ -10,7 +10,7 @@ import Animated, {
   useScrollOffset,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatAge, type GoalFilter } from "@parentpal/shared";
+import { formatAge, MOMENTS_PER_PATTERN, type GoalFilter } from "@parentpal/shared";
 import { FeaturedGoalCard, GoalTile } from "@/components/GoalCards";
 import { Icon } from "@/components/Icon";
 import { Pebble } from "@/components/Pebble";
@@ -43,7 +43,10 @@ export default function Home() {
   const advisors = useQuery({ queryKey: ["advisors"], queryFn: api.advisors, staleTime: Infinity });
   const subscribed = me?.subscription?.status === "active_fake";
   const name = child?.nickname ?? "Your child";
-  const momentCount = moments.data?.moments.length ?? 0;
+  const patterns = useQuery({ queryKey: ["patterns"], queryFn: api.patterns });
+  const hasPattern = !!patterns.data?.patterns.length;
+  // Safety-flagged moments never feed patterns, so they don't count toward the first one (same as Story).
+  const momentCount = moments.data?.moments.filter((m) => m.tagStatus !== "safety").length ?? 0;
 
   // Scroll-linked header: the big name lifts and fades as a compact bar slides in.
   const ref = useAnimatedRef<Animated.ScrollView>();
@@ -114,11 +117,13 @@ export default function Home() {
               {momentCount ? `${name}'s Story` : `Start ${name}'s Story`}
             </T>
             <T color="#D5E7DC" style={{ maxWidth: "90%" }}>
-              {momentCount >= 3
-                ? `${momentCount} moments logged. Your first pattern is in Story.`
-                : momentCount
-                  ? `${momentCount} of 3 moments logged. A pattern appears after 3.`
-                  : "Log what happened today, big or small. Patterns appear after 3 moments."}
+              {hasPattern
+                ? `${momentCount} moments logged. Your latest pattern is in Story.`
+                : momentCount >= MOMENTS_PER_PATTERN
+                  ? `${momentCount} moments logged. Keep going: a pattern appears once a few have something in common.`
+                  : momentCount
+                    ? `${momentCount} of ${MOMENTS_PER_PATTERN} moments logged. A pattern appears after ${MOMENTS_PER_PATTERN}.`
+                    : `Log what happened today, big or small. Patterns appear after ${MOMENTS_PER_PATTERN} moments.`}
             </T>
             <Button label="Add moment" kind="accent" icon="plus" onPress={() => router.push("/moment/new")} style={{ alignSelf: "flex-start" }} />
           </View>

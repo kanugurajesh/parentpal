@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { OnboardingFrame } from "@/components/OnboardingFrame";
 import { Button, ErrorNote, Field, T } from "@/components/ui";
@@ -16,6 +16,10 @@ export default function SignIn() {
   const { me, hasSession, signIn, refreshMe } = useSession();
   const canCreate = hasSession && me?.user.isGuest;
   const [mode, setMode] = useState<"create" | "login">(params.mode === "create" && canCreate ? "create" : "login");
+  // /me may still be loading on first render; honour mode=create once we know this is a guest.
+  useEffect(() => {
+    if (params.mode === "create" && canCreate) setMode("create");
+  }, [params.mode, canCreate]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

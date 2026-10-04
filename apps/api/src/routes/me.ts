@@ -34,7 +34,10 @@ export const meRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get("/me", { schema: { response: { 200: Me } } }, (req) => loadMe(req.userId));
 
   app.patch("/me", { schema: { body: UpdateMe, response: { 200: User } } }, async (req) => {
-    const [u] = await db.update(schema.users).set(req.body).where(eq(schema.users.id, req.userId)).returning();
+    // Drizzle refuses an empty SET, so a no-op patch just returns the profile.
+    const [u] = Object.keys(req.body).length
+      ? await db.update(schema.users).set(req.body).where(eq(schema.users.id, req.userId)).returning()
+      : await db.select().from(schema.users).where(eq(schema.users.id, req.userId));
     return toUser(u);
   });
 
@@ -71,11 +74,10 @@ export const meRoutes: FastifyPluginAsyncZod = async (app) => {
   const ChildParams = z.object({ id: z.string().uuid() });
 
   app.patch("/children/:id", { schema: { params: ChildParams, body: UpdateChild, response: { 200: Child } } }, async (req) => {
-    const [c] = await db
-      .update(schema.children)
-      .set(req.body)
-      .where(and(eq(schema.children.id, req.params.id), eq(schema.children.userId, req.userId)))
-      .returning();
+    const owned = and(eq(schema.children.id, req.params.id), eq(schema.children.userId, req.userId));
+    const [c] = Object.keys(req.body).length
+      ? await db.update(schema.children).set(req.body).where(owned).returning()
+      : await db.select().from(schema.children).where(owned);
     if (!c) throw notFound("Child");
     return toChild(c);
   });

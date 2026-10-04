@@ -28,6 +28,15 @@ const EnvSchema = z.object({
 const parsed = EnvSchema.parse(process.env);
 const isTest = parsed.NODE_ENV === "test" || process.env.VITEST === "true";
 
+// The dev defaults are public (they're in this file), so production must set its own.
+if (parsed.NODE_ENV === "production") {
+  const unset = [
+    parsed.JWT_SECRET === EnvSchema.shape.JWT_SECRET.parse(undefined) && "JWT_SECRET",
+    parsed.ADMIN_KEY === EnvSchema.shape.ADMIN_KEY.parse(undefined) && "ADMIN_KEY",
+  ].filter(Boolean);
+  if (unset.length) throw new Error(`Set ${unset.join(" and ")} in production: the dev defaults are not secret.`);
+}
+
 export const env = {
   ...parsed,
   isTest,

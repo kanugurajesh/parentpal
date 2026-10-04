@@ -35,6 +35,17 @@ describe("family playbook", () => {
     expect(unlocked.statusCode).toBe(200);
   });
 
+  it("shares nothing once the parent clears every win", async () => {
+    const g = await onboarded(app, ["tantrums", "sleep"]);
+    const cleared = await app.inject({ method: "PUT", url: "/v1/playbook/wins", headers: g.auth, payload: { winIds: [] } });
+    expect(cleared.json().wins).toEqual([]);
+    const token = tokenOf((await addCaregiver(g.auth)).json().caregiver.url);
+    const html = (await page(token)).payload;
+    const wins = await db.select().from(schema.wins).where(eq(schema.wins.position, 1));
+    const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    for (const w of wins.filter((w) => w.goalSlug === "tantrums" || w.goalSlug === "sleep")) expect(html).not.toContain(escape(w.title));
+  });
+
   it("creates an unguessable link with a ready-to-send message, up to 5 people", async () => {
     const g = await onboarded(app);
     const res = await addCaregiver(g.auth);

@@ -84,7 +84,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(0, `Can't reach ParentPal's server at ${API_URL}. Check that the API is running.`);
   }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: { message?: string } | null = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // A gateway or tunnel error page (HTML), not our API: report the status, not a parse error.
+    throw new ApiError(res.status, res.ok ? "The server sent an unexpected response." : `Request failed (${res.status}).`);
+  }
   if (!res.ok) throw new ApiError(res.status, data?.message ?? `Request failed (${res.status}).`);
   return data as T;
 }
@@ -154,12 +160,18 @@ export async function streamChat(
   onEvent: (e: ChatStreamEvent) => void,
   signal?: AbortSignal,
 ) {
-  const res = await expoFetch(`${API_URL}/v1/chat/messages`, {
-    method: "POST",
-    headers: { ...TUNNEL_HEADERS, "Content-Type": "application/json", Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(input),
-    signal,
-  });
+  let res: Awaited<ReturnType<typeof expoFetch>>;
+  try {
+    res = await expoFetch(`${API_URL}/v1/chat/messages`, {
+      method: "POST",
+      headers: { ...TUNNEL_HEADERS, "Content-Type": "application/json", Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(input),
+      signal,
+    });
+  } catch (e) {
+    if (signal?.aborted) throw e; // the caller cancelled; keep the abort error
+    throw new ApiError(0, `Can't reach ParentPal's server at ${API_URL}. Check that the API is running.`);
+  }
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");
     let message = `Request failed (${res.status}).`;

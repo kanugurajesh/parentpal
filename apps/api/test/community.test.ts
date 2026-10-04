@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { ageBandOf } from "@parentpal/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../src/db/client";
@@ -223,6 +223,44 @@ describe("circles", () => {
     const a = await member();
     for (let i = 0; i < 5; i++) expect((await post(a.auth, `Rate limit check number ${i} for today`)).statusCode).toBe(200);
     expect((await post(a.auth, "Rate limit check number 6 for today")).statusCode).toBe(429);
+  });
+
+  it("pages through the feed without skipping posts that share a timestamp", async () => {
+    // 25 posts (more than one page) from 5 authors, to stay under the daily post limit.
+    const authors = await Promise.all(Array.from({ length: 5 }, () => member(["focus"])));
+    const ids: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      const res = await post(authors[i % 5].auth, `Paging check ${i}: we tried a visual timer today`, {}, "focus");
+      ids.push(res.json().post.id);
+    }
+    // Same millisecond, different microseconds: the old cursor skipped posts inside this gap.
+    const t = schema.communityPosts;
+    for (const [i, id] of ids.entries()) await db.update(t).set({ createdAt: sql`'2026-01-01T00:00:00.123Z'::timestamptz + ${`${i} microseconds`}::interval` }).where(eq(t.id, id));
+
+    const reader = await member(["focus"]);
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: { posts: { id: string }[]; nextCursor: string | null } = (await feed(reader.auth, `?band=all${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, "focus")).json();
+      seen.push(...page.posts.map((p) => p.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(new Set(seen).size).toBe(seen.length);
+    for (const id of ids) expect(seen).toContain(id);
+  });
+
+  it("notifies the post's author when a held reply is approved", async () => {
+    const a = await member();
+    const b = await member();
+    const id = (await post(a.auth, "Approval notice test: how do you handle bedtime stalling?")).json().post.id;
+    const r = await reply(b.auth, id, "We held this one back for review");
+    const replyId = r.json().reply.id;
+    // Put it back in review regardless of what moderation decided, then approve it.
+    await db.update(schema.communityReplies).set({ status: "review" }).where(eq(schema.communityReplies.id, replyId));
+    await db.delete(schema.communityNotices).where(eq(schema.communityNotices.postId, id));
+    await app.inject({ method: "POST", url: `/v1/admin/community/reply/${replyId}`, headers: admin, payload: { action: "approve" } });
+    const notices = await db.select().from(schema.communityNotices).where(eq(schema.communityNotices.postId, id));
+    expect(notices.some((n) => n.count >= 1 && !n.guideReplied)).toBe(true);
   });
 
   it("filters by age band and borrows from neighbouring bands when quiet", async () => {

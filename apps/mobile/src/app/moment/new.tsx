@@ -16,11 +16,13 @@ const PROMPTS = ["What happened just before?", "What did they do?", "How did it 
 
 export default function NewMoment() {
   const qc = useQueryClient();
-  const { me } = useSession();
+  const { me, meError, refreshMe } = useSession();
   // Set when opened from a "How did it go?" check-in notification.
   const { tried } = useLocalSearchParams<{ tried?: string }>();
   const kids = me?.children ?? [];
-  const [childId, setChildId] = useState(kids[0]?.id ?? "");
+  const [picked, setPicked] = useState<string | null>(null);
+  // Derived, not initial state: opened from a notification on cold start, /me may not have loaded yet.
+  const childId = picked ?? kids[0]?.id ?? "";
   const [text, setText] = useState(tried ? `Tried "${tried}". ` : "");
   const [result, setResult] = useState<CreateMomentResponse | null>(null);
 
@@ -56,6 +58,7 @@ export default function NewMoment() {
       }
       footer={
         <>
+          {!me && meError ? <ErrorNote message={meError.message} onRetry={() => void refreshMe()} /> : null}
           {save.error ? <ErrorNote message={(save.error as Error).message} /> : null}
           <Button label="Save moment" loading={save.isPending} disabled={text.trim().length < 3 || !childId} onPress={() => save.mutate()} />
         </>
@@ -64,7 +67,7 @@ export default function NewMoment() {
       {kids.length > 1 ? (
         <View style={{ flexDirection: "row", gap: space.sm }} accessibilityRole="radiogroup">
           {kids.map((k) => (
-            <Chip key={k.id} label={k.nickname} selected={k.id === childId} onPress={() => setChildId(k.id)} />
+            <Chip key={k.id} label={k.nickname} selected={k.id === childId} onPress={() => setPicked(k.id)} />
           ))}
         </View>
       ) : null}

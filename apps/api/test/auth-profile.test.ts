@@ -87,6 +87,31 @@ describe("family profile", () => {
     expect((await put([])).statusCode).toBe(400);
   });
 
+  it("treats an empty patch as a no-op instead of failing", async () => {
+    const g = await onboarded(app);
+    const me = await app.inject({ method: "PATCH", url: "/v1/me", headers: g.auth, payload: {} });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().firstName).toBe("Sam");
+    const child = await app.inject({ method: "PATCH", url: `/v1/children/${g.childId}`, headers: g.auth, payload: {} });
+    expect(child.statusCode).toBe(200);
+    expect(child.json().nickname).toBe("Mo");
+    const other = await guest(app);
+    expect((await app.inject({ method: "PATCH", url: `/v1/children/${g.childId}`, headers: other.auth, payload: {} })).statusCode).toBe(404);
+  });
+
+  it("rejects a birth month in the future", async () => {
+    const g = await guest(app);
+    const now = new Date();
+    if (now.getMonth() === 11) return; // December: no future month left this year
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/children",
+      headers: g.auth,
+      payload: { nickname: "Bo", sex: "girl", birthMonth: now.getMonth() + 2, birthYear: now.getFullYear() },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("can't touch another user's child", async () => {
     const a = await onboarded(app);
     const b = await guest(app);

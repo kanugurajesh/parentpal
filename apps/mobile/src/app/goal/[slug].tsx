@@ -6,14 +6,18 @@ import { GoalArt } from "@/components/GoalArt";
 import { Icon } from "@/components/Icon";
 import { Button, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
-import { addCheckIn, hasPermission, NOTIFICATIONS_SUPPORTED, turnOnNotifications, updatePrefs, useNotificationState } from "@/lib/notifications";
+import { addCheckIn, hasPermission, NOTIFICATIONS_SUPPORTED, setAccountNotifications, turnOnNotifications, updatePrefs, useNotificationState } from "@/lib/notifications";
+import { useSession } from "@/lib/session";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
 
 /** Commits to trying a win; the next morning a check-in asks how it went (and opens the moment log). */
 function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
   const { prefs, checkIns } = useNotificationState();
+  const { me, refreshMe } = useSession();
+  // With the account switch off nothing is scheduled, so a pending check-in would never arrive.
+  const accountOn = me?.user.notificationsEnabled !== false;
   if (!NOTIFICATIONS_SUPPORTED) return null;
-  if (checkIns.some((c) => c.winId === win.id)) {
+  if (accountOn && checkIns.some((c) => c.winId === win.id)) {
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.xs }} accessibilityLiveRegion="polite">
         <Icon name="check" size={20} color={color.moss} />
@@ -30,7 +34,7 @@ function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
       icon="check"
       accessibilityHint="Sends one reminder tomorrow morning to ask how it went"
       onPress={async () => {
-        if (!prefs.enabled || !prefs.checkIns || !(await hasPermission())) {
+        if (!accountOn || !prefs.enabled || !prefs.checkIns || !(await hasPermission())) {
           const on = await turnOnNotifications({
             title: "Check in tomorrow?",
             message: "We'll send one reminder tomorrow morning asking how it went, so you can note it in a line. Those notes are how ParentPal spots patterns.",
@@ -40,6 +44,10 @@ function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
           });
           if (!on) return;
           if (!prefs.checkIns) await updatePrefs({ checkIns: true });
+          if (!accountOn) {
+            await setAccountNotifications(true);
+            await refreshMe();
+          }
         }
         await addCheckIn(win, goalSlug);
       }}
@@ -180,7 +188,7 @@ export default function GoalScreen() {
                 label={`Ask about ${g.title.toLowerCase()}`}
                 kind="secondary"
                 icon="ask"
-                onPress={() => router.push({ pathname: "/(tabs)/ask", params: { topic: g.slug } })}
+                onPress={() => router.navigate({ pathname: "/(tabs)/ask", params: { topic: g.slug } })}
               />
 
               <View style={{ gap: space.sm }}>

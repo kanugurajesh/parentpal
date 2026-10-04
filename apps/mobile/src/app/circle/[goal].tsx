@@ -58,6 +58,8 @@ export default function CircleFeed() {
         </ScrollView>
 
         {feed.isLoading || circles.isLoading ? <Loading /> : null}
+        {/* The feed waits on circles, so a circles failure would otherwise leave a blank screen. */}
+        {circles.error ? <ErrorNote message={(circles.error as Error).message} onRetry={() => circles.refetch()} /> : null}
         {feed.error ? <ErrorNote message={(feed.error as Error).message} onRetry={() => feed.refetch()} /> : null}
 
         {feed.data && !posts.length ? (

@@ -31,7 +31,15 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       schema: {
         params: z.object({ goal: GoalSlug }),
-        querystring: z.object({ band: z.union([AgeBand, z.literal("all")]).default("all"), cursor: z.string().datetime().optional() }),
+        querystring: z.object({
+          band: z.union([AgeBand, z.literal("all")]).default("all"),
+          /** Opaque "<iso>|<id>" from the previous page's nextCursor. */
+          cursor: z
+            .string()
+            .regex(/^[^|]+\|[0-9a-f-]{36}$/i, "Invalid cursor")
+            .refine((c) => !Number.isNaN(Date.parse(c.split("|")[0])), "Invalid cursor")
+            .optional(),
+        }),
         response: { 200: FeedResponse },
       },
     },

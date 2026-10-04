@@ -87,7 +87,9 @@ export default function Story() {
             <T color={color.inkSoft}>
               {count === 0
                 ? "A moment is a few lines about something that happened: what came before, what they did, how it ended."
-                : `${count} down, ${MOMENTS_PER_PATTERN - count} to go. Your first pattern appears after the third.`}
+                : count < MOMENTS_PER_PATTERN
+                  ? `${count} down, ${MOMENTS_PER_PATTERN - count} to go. Your first pattern appears after the third.`
+                  : "Keep logging. A pattern appears once a few moments have something in common."}
             </T>
             <Button label="Add moment" icon="plus" onPress={() => router.push("/moment/new")} />
           </View>

@@ -158,7 +158,14 @@ export function MoreMenu({
   const onPress = async () => {
     if (!isMe) return setOpen(true);
     const ok = await confirm({ title: `Delete this ${what}?`, message: "It will be removed for everyone. This can't be undone.", confirmLabel: "Delete", cancelLabel: "Cancel", tone: "danger", icon: "trash" });
-    if (ok) await run(() => (targetType === "post" ? api.deletePost(targetId) : api.deleteReply(targetId)), "deleted");
+    if (!ok) return;
+    try {
+      await (targetType === "post" ? api.deletePost(targetId) : api.deleteReply(targetId));
+      onDone("deleted");
+    } catch (e) {
+      // The sheet (and its error note) isn't open on this path, so say it in a dialog.
+      await confirm({ title: `Couldn't delete this ${what}`, message: (e as Error).message, confirmLabel: "OK", cancelLabel: null, icon: "trash" });
+    }
   };
 
   return (

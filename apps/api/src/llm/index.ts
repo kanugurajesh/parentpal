@@ -103,16 +103,26 @@ export const llm = {
     const t0 = performance.now();
     const { deltas, usage } = provider.stream(req);
     let full = "";
+    let logged = false;
     try {
       for await (const d of deltas) {
         full += d;
         yield d;
       }
+      logged = true;
       await logCall(ctx, await usage, performance.now() - t0);
       return full;
     } catch (err) {
+      logged = true;
       await logCall(ctx, ZERO, performance.now() - t0, err);
       throw err;
+    } finally {
+      // The consumer stopped early (client disconnected): the provider never reports usage, so
+      // estimate it (~4 chars per token) rather than leave the spend out of the cost report.
+      if (!logged) {
+        const promptChars = req.system.length + req.messages.reduce((n, m) => n + m.content.length, 0);
+        await logCall(ctx, { inputTokens: Math.ceil(promptChars / 4), outputTokens: Math.ceil(full.length / 4) }, performance.now() - t0);
+      }
     }
   },
 };

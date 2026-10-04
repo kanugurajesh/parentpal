@@ -13,7 +13,7 @@ import { db, schema } from "../db/client";
 import { env } from "../env";
 import { badRequest, HttpError, notFound } from "../lib/errors";
 import { iso } from "../lib/serialize";
-import { isSubscribed } from "../routes/goals";
+import { isSubscribed } from "./entitlement";
 import { createMoment } from "./story";
 
 /**
@@ -67,10 +67,13 @@ async function shareableWins(userId: string) {
 /** The shared wins: the parent's choice, or win 1 of each goal until they choose. Wins they lost access to drop out. */
 async function sharedWins(userId: string) {
   const allowed = await shareableWins(userId);
+  const [user] = await db.select({ chosenAt: schema.users.playbookChosenAt }).from(schema.users).where(eq(schema.users.id, userId));
+  if (!user?.chosenAt) return allowed.filter((w) => w.position === 1);
+  // Once the parent has chosen, an empty choice means share nothing.
   const chosen = new Set(
     (await db.select({ id: schema.playbookWins.winId }).from(schema.playbookWins).where(eq(schema.playbookWins.userId, userId))).map((r) => r.id),
   );
-  return chosen.size ? allowed.filter((w) => chosen.has(w.id)) : allowed.filter((w) => w.position === 1);
+  return allowed.filter((w) => chosen.has(w.id));
 }
 
 async function primaryChild(userId: string) {
@@ -130,6 +133,7 @@ export async function setPlaybookWins(userId: string, winIds: string[]) {
   await db.transaction(async (tx) => {
     await tx.delete(schema.playbookWins).where(eq(schema.playbookWins.userId, userId));
     if (winIds.length) await tx.insert(schema.playbookWins).values([...new Set(winIds)].map((winId) => ({ userId, winId })));
+    await tx.update(schema.users).set({ playbookChosenAt: new Date() }).where(eq(schema.users.id, userId));
   });
   return getPlaybook(userId);
 }
