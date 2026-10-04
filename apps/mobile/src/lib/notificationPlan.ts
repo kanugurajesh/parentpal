@@ -18,13 +18,15 @@ export interface CheckIn {
   winId: string;
   winTitle: string;
   goalSlug: string;
+  /** The server-side try this check-in asks about. Missing on check-ins saved before tracking existed. */
+  tryId?: string;
   /** Local date the check-in fires. */
   dueDate: string;
 }
 
 export type NotificationData =
   | { kind: "tip"; notificationId: string; goalSlug: string | null }
-  | { kind: "checkin"; winTitle: string; goalSlug: string }
+  | { kind: "checkin"; winTitle: string; goalSlug: string; tryId?: string }
   | { kind: "log" };
 
 export const DAILY_TIME_OPTIONS: { value: DailyTime; label: string }[] = [
@@ -70,7 +72,7 @@ export function planNotifications(input: {
         at: atLocalTime(day, CHECK_IN_TIME),
         title: `How did "${checkIn.winTitle}" go?`,
         body: `Tap to note what happened${child ? ` with ${child}` : ""}. One line is enough, and it helps spot patterns.`,
-        data: { kind: "checkin", winTitle: checkIn.winTitle, goalSlug: checkIn.goalSlug },
+        data: { kind: "checkin", winTitle: checkIn.winTitle, goalSlug: checkIn.goalSlug, tryId: checkIn.tryId },
       });
     }
     if (prefs.logReminders && day === reminderDay) {

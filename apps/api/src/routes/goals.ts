@@ -17,7 +17,7 @@ import { requireUser } from "../lib/auth";
 import { notFound } from "../lib/errors";
 import { winCommunityStats } from "../services/community";
 import { isSubscribed } from "../services/entitlement";
-import { winProgress } from "../services/progress";
+import { adviceFor, isStuck, winProgress } from "../services/progress";
 import { loadMe } from "./me";
 
 async function sourceMap(ids: string[]) {
@@ -118,6 +118,10 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
         wins: wins.map((w) => {
           // Only the first win is free. Locked wins still show the title so users see what's inside.
           const locked = w.position > 1 && !subscribed;
+          const my = mine.get(w.id);
+          // Suggest the next win after this one (wrapping around) that isn't stuck itself.
+          const after = [...wins.filter((o) => o.position > w.position), ...wins.filter((o) => o.position < w.position)];
+          const next = after.find((o) => !isStuck(mine.get(o.id)?.outcomes ?? []));
           return {
             id: w.id,
             position: w.position,
@@ -128,7 +132,15 @@ export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
             whatToExpect: locked ? null : w.whatToExpect,
             sources: pick(w.sourceIds),
             community: community.get(w.id) ?? null,
-            mine: locked ? null : (mine.get(w.id) ?? null),
+            mine:
+              locked || !my
+                ? null
+                : {
+                    tried: my.tried,
+                    helped: my.helped,
+                    openTryId: my.openTryId,
+                    advice: adviceFor(my.outcomes, next ? { ...next, locked: next.position > 1 && !subscribed } : null),
+                  },
           };
         }),
       };

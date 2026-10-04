@@ -33,9 +33,13 @@ import type {
   Notification,
   Pattern,
   Plan,
+  ProgressResponse,
+  ReportOutcome,
+  ReportOutcomeResponse,
   Topic,
   UpdateMe,
   User,
+  WinTry,
 } from "@parentpal/shared";
 
 /**
@@ -118,6 +122,10 @@ export const api = {
   addMoment: (childId: string, text: string) => request<CreateMomentResponse>("POST", "/moments", { childId, text }),
   deleteMoment: (id: string) => request<{ deleted: true }>("DELETE", `/moments/${id}`),
   patterns: () => request<{ patterns: Pattern[] }>("GET", "/patterns"),
+
+  startTry: (winId: string, childId?: string) => request<WinTry>("POST", "/tries", { winId, childId }),
+  reportOutcome: (tryId: string, body: ReportOutcome) => request<ReportOutcomeResponse>("POST", `/tries/${tryId}/outcome`, body),
+  progress: () => request<ProgressResponse>("GET", "/progress"),
 
   chat: () => request<{ messages: ChatMessage[] }>("GET", "/chat"),
   clearChat: () => request<{ messages: ChatMessage[] }>("DELETE", "/chat"),

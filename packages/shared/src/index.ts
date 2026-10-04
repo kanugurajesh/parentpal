@@ -157,6 +157,20 @@ export const GoalsResponse = z.object({
 });
 export type GoalsResponse = z.infer<typeof GoalsResponse>;
 
+/**
+ * Rule-based next step for a win (no LLM):
+ *  - keep: the last 2 tries helped
+ *  - patience: it's helping a bit, not yet fully
+ *  - switch: the last 3 didn't help, and another unlocked win is available (winId)
+ *  - ask: the last 3 didn't help, and there's nothing else unlocked to try
+ */
+export const WinAdvice = z.object({
+  kind: z.enum(["keep", "patience", "switch", "ask"]),
+  text: z.string(),
+  winId: z.string().nullable(),
+});
+export type WinAdvice = z.infer<typeof WinAdvice>;
+
 export const Win = z.object({
   id: z.string(),
   position: z.number().int(),
@@ -170,7 +184,13 @@ export const Win = z.object({
   community: z.object({ tried: z.number().int(), helped: z.number().int() }).nullable().optional(),
   /** This family's own record with the win. Null for locked wins. */
   mine: z
-    .object({ tried: z.number().int(), helped: z.number().int(), openTryId: z.string().uuid().nullable() })
+    .object({
+      tried: z.number().int(),
+      helped: z.number().int(),
+      openTryId: z.string().uuid().nullable(),
+      /** What to do next, from the recent outcomes. Null until there's a clear signal. */
+      advice: WinAdvice.nullable().optional(),
+    })
     .nullable()
     .optional(),
 });
@@ -574,6 +594,11 @@ export function ageBandOf(months: number): AgeBand {
 /** An open try older than this counts as "no answer" and drops out of progress. */
 export const OPEN_TRY_DAYS = 7;
 
+const WeekCounts = z.object({ tried: z.number().int(), helped: z.number().int() });
+/** The first week of tries against the last 7 days. Null until both have at least 2 tries. */
+export const ProgressTrend = z.object({ start: WeekCounts, now: WeekCounts });
+export type ProgressTrend = z.infer<typeof ProgressTrend>;
+
 export const WinTry = z.object({
   id: z.string().uuid(),
   winId: z.string(),
@@ -609,6 +634,7 @@ export const GoalProgress = OutcomeCounts.extend({
   goalTitle: z.string(),
   /** The last reported outcomes, oldest first. */
   recent: z.array(WorkedOutcome),
+  trend: ProgressTrend.nullable(),
   wins: z.array(OutcomeCounts.extend({ winId: z.string(), title: z.string(), position: z.number().int() })),
 });
 export type GoalProgress = z.infer<typeof GoalProgress>;

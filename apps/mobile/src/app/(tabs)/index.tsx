@@ -14,6 +14,7 @@ import { formatAge, MOMENTS_PER_PATTERN, type GoalFilter } from "@parentpal/shar
 import { FeaturedGoalCard, GoalTile } from "@/components/GoalCards";
 import { Icon } from "@/components/Icon";
 import { Pebble } from "@/components/Pebble";
+import { progressLine } from "@/components/Progress";
 import { Button, Chip, Disclaimer, ErrorNote, Loading, T } from "@/components/ui";
 import { api } from "@/lib/api";
 import { usePrimaryChild, useSession } from "@/lib/session";
@@ -40,6 +41,7 @@ export default function Home() {
   const [filter, setFilter] = useState<GoalFilter>("all");
   const goals = useQuery({ queryKey: ["goals", filter], queryFn: () => api.goals(filter) });
   const moments = useQuery({ queryKey: ["moments"], queryFn: api.moments });
+  const progress = useQuery({ queryKey: ["progress"], queryFn: () => api.progress() });
   const advisors = useQuery({ queryKey: ["advisors"], queryFn: api.advisors, staleTime: Infinity });
   const subscribed = me?.subscription?.status === "active_fake";
   const name = child?.nickname ?? "Your child";
@@ -170,7 +172,7 @@ export default function Home() {
                 <Button label="Edit" kind="ghost" onPress={() => router.push("/goals")} accessibilityHint="Change the goals you're working on" />
               </View>
               {goals.data.personalized.map((g) => (
-                <FeaturedGoalCard key={g.slug} goal={g} subscribed={subscribed} />
+                <FeaturedGoalCard key={g.slug} goal={g} subscribed={subscribed} progress={progressLine(progress.data?.goals.find((p) => p.goalSlug === g.slug))} />
               ))}
             </View>
           ) : null}

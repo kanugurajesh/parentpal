@@ -17,6 +17,7 @@ This is a portfolio MVP. It covers one working path through the app from start t
 | **Story** | Log moments in free text. An LLM tags each one as trigger / behavior / outcome. After every 3 moments it writes a pattern insight that links back to the moments it came from. |
 | **Ask** | Streaming chat (SSE). Answers draw on the child's age, active goals and recent moments, plus retrieved content shown as citations. Vague questions get one clarifying question with tap-to-answer options. Replies can be rated 👍/👎, copied, shared and bookmarked. |
 | **Notifications** | On-device reminders that serve the try → log → pattern loop: a daily idea sent when it's usable (sleep ideas before bedtime), a "How did it go?" check-in the morning after tapping **I'll try this** on a win (opens the moment log, filled in), and one nudge after 3 days without a moment. At most one a day, never at night, each type switchable in Settings. Tips also collect in an in-app inbox. See [How notifications work](#how-notifications-work). |
+| **Progress** | Every **I'll try this** is saved as a try. The parent taps how it went (Helped / A bit / Not yet) on the goal screen, or from the next-morning check-in. Each win shows "You tried this 4× · helped 3" and a next step ("This is working, keep going" or "Not helping yet. Try win 2?"). Goals show recent outcomes as dots and, after a week, week 1 against this week. Caregivers' "It worked / It was tough" counts too. See [Progress tracker](#6-progress-tracker-is-it-working). |
 | **Circles** | Anonymous groups by goal, with posts tagged by the child's age band. Each parent gets a different nickname in each circle. Three post types: question, **what worked** (tied to a win, with an outcome) and sharing. Questions get a cited "ParentPal guide" reply straight away. "What worked" reports add up to a "Parents like you: 5 of 7 said it helped" line on the win. Every post and reply is moderated before anyone sees it. See [How Circles work](#how-circles-work). |
 | **Family playbook** | Share the wins you're trying, with the exact words to say, with grandparents, the other parent, a nanny or a teacher. Each person gets a private link that needs no app or login. They can send back "It worked" or "It was tough" plus a note, which lands in the child's Story as "Logged by Nani" and counts towards patterns. See [Feature brief: Family Playbook](#feature-brief-family-playbook). |
 | **Profile** | Family profile, sign in / create account (upgrades the guest account), bookmarks, manage subscription (stub), refer friends (stub), hard account deletion. |
@@ -24,7 +25,7 @@ This is a portfolio MVP. It covers one working path through the app from start t
 
 ## What's new: features built on top of the original idea
 
-The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Two larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
+The first version of ParentPal follows the original product: goals and wins, an AI chat, a moment journal with patterns, and notifications. Three larger features were then added that the original doesn't have, plus several smaller improvements. Each is described below in full: what it is, every screen and control, the rules behind it, and how it was tested. Product reasoning for each one is in its feature brief further down.
 
 | | Feature | One line |
 |---|---|---|
@@ -33,6 +34,7 @@ The first version of ParentPal follows the original product: goals and wins, an 
 | 3 | [**Smaller improvements**](#3-smaller-improvements) | "Ask other parents" from chat, community stats on wins, reply notices in the inbox, coloured Story pebbles, and fixes. |
 | 4 | [**Quality work**](#4-quality-work-behind-these-features) | 26 new automated tests, live-model checks, and three new entries in the AI mistakes log. |
 | 5 | [**Bug-fix pass**](#5-bug-fix-pass) | A review of the whole app: paid content no longer leaks through chat, no more 500s from odd input, and screens that used to fail silently now say so. |
+| 6 | [**Progress tracker**](#6-progress-tracker-is-it-working) | Each try of a win gets an outcome, so parents see what's working, get a next step, and see week 1 against this week. |
 
 ### 1. Circles: anonymous parent community
 
@@ -180,6 +182,42 @@ A review of the API and the mobile app turned up a set of real bugs, all fixed. 
 | Sign-in opened in login mode before the profile loaded | It switches to "create account" once it knows you're a guest. |
 
 **Not done yet** (known, lower priority): rate limits on guest creation, chat and moments; count-then-insert races on child, caregiver and note limits; login timing; reactions and reports left behind when a post is deleted; keyboard offsets in chat; a fallback for browsers without a month picker.
+
+### 6. Progress tracker: is it working?
+
+**Why.** Wins tell parents what to try, but nothing showed whether it was working. "I'll try this" only set a reminder on the phone, and the answer came back as free text. After a hard week, memory says "nothing works". The tracker records every attempt and its outcome so parents can see which wins help, when to switch, and that their effort is paying off.
+
+**What the parent sees**
+
+| Where | What it shows |
+|---|---|
+| **Win card**, after **I'll try this** | "You're trying this. Once you have, how did it go?" with three chips: **Helped**, **A bit**, **Not yet**, plus "Add a note about what happened". A tap records the outcome and cancels the pending check-in. |
+| **Win card**, once reported | "You tried this 4× · helped 3", above the "Parents like you" line. |
+| **Win card**, next step | A coloured note chosen by the rules below. "Ask" includes an **Ask ParentPal** button. |
+| **Goal screen**, top | **Your progress**: a headline, one dot per recent outcome (green helped, apricot a bit, grey not yet), counts, and once there's enough data two bars: **Week 1** against **This week**. |
+| **Home**, goal cards | "Helped 3 of the last 5 tries", or "Helped 3 of 3 this week, up from 1 of 4 in week 1" when things have improved. |
+| **Check-in notification** | Opens the moment log with "Did it help?" chips; saving records the outcome and the note together. |
+| **Caregiver page** (`/p/:token`) | An optional "Which idea?" picker. "It worked" or "It was tough" about a picked win counts as Helped or Not yet. With one shared win it's picked automatically. |
+
+**Rules**
+
+- **Tries:** "I'll try this" creates a try. Tapping it again while a try is open reuses it. Only reported tries count, and an open try older than 7 days counts as "no answer". Only unlocked wins can be tracked.
+- **Next step** (`adviceFor()`, no LLM):
+
+  | Recent outcomes for the win | Note |
+  |---|---|
+  | Last 2 helped | "This is working. Keep going, and use the same words each time." |
+  | Last 2 helped a bit, none failed | "It's starting to help. Small changes count, so give it a week or two." |
+  | Last 3 didn't help, another win unlocked | "Not helping yet. Try win 2, "…"?" (the next win, wrapping around, that isn't stuck too) |
+  | Last 3 didn't help, nothing else unlocked | "Not helping yet. Ask ParentPal what else might work…" (never a paywall pitch) |
+
+- **Trend** (`trendOf()`): the first 7 days of tries against the last 7 days. The two windows never overlap, and the trend appears only when each has at least 2 tries. Home only mentions it when it's an improvement.
+- **Chat:** the family context sent to the LLM includes "Wins they tried and how it went", so answers can build on what's working.
+- **Notes:** a note sent with an outcome goes through `createMoment()`, so the safety check, tagging and patterns work as before, and the moment is linked to the try.
+
+**Built with:** `win_tries` table (migration `0005_win_tries.sql`), `services/progress.ts`, `routes/progress.ts`, `mine` (with `advice`) on each win in `GET /goals/:slug`, and the mobile `components/Progress.tsx`. The seed script now updates wins in place and deletes only removed ones, because deleting a win cascades to parents' tries and playbook choices.
+
+**Tests:** `test/progress.test.ts` (11) covers reusing open tries, locked wins, ownership, counts per goal and win, open tries expiring, notes becoming linked moments (including the safety path), caregiver reports, account deletion, the chat context, every advice rule (including the locked-win case and wrap-around), and the trend windows. 95 tests in total, all passing.
 
 ## Feature brief: Circles
 
@@ -383,6 +421,7 @@ Requests flow **route → service → db / llm**:
 | Accounts | `users`, `children`, `subscriptions` |
 | Content | `goals`, `wins`, `sources`, `content_chunks`, `user_goals` |
 | Story | `moments`, `patterns`, `pattern_moments` |
+| Progress | `win_tries` (one row per attempt at a win; `outcome` is null until reported) |
 | Chat | `conversations`, `messages`, `message_feedback`, `bookmarks` |
 | Ops | `notifications`, `llm_calls`, `safety_events` |
 
@@ -409,7 +448,7 @@ Requests flow **route → service → db / llm**:
 
 | Kind | When it fires | What it says | Tapping it opens |
 |---|---|---|---|
-| **Check-in** | 8:30 am the day after the parent taps **I'll try this** on a win | *How did "Name the feeling" go?* | The moment log, titled "How did it go?" with *Tried "Name the feeling".* filled in |
+| **Check-in** | 8:30 am the day after the parent taps **I'll try this** on a win | *How did "Name the feeling" go?* | The moment log, titled "How did it go?" with *Tried "Name the feeling".* filled in and "Did it help?" chips that record the outcome |
 | **Logging reminder** | 7:30 pm on the 3rd day without a logged moment, once per quiet streak | *Anything happen with Mo lately?* | An empty moment log |
 | **Daily idea** | At the chosen time. **Smart** (default): sleep ideas 6:30 pm, picky-eating ideas 4:30 pm, everything else 8:00 am. Or a fixed Morning / Midday / Evening. | The day's tip from the server, e.g. *Today's idea: The 2-minute warning* | That goal's page (and marks the tip read) |
 
@@ -491,7 +530,7 @@ Three reports from different parents hide an item until a moderator decides; onc
   - `moments.caregiverId` and `moments.loggedBy` record who logged a moment. The name is a snapshot, so it survives removing the caregiver.
 - **Entitlement:** only wins the parent can see can be shared (win 1, or any win with a subscription). If a subscription lapses, locked wins drop out of the page.
 - **One moment pipeline:** `createMoment()` in `services/story.ts` is used by both the parent's Story and the caregiver page. It runs the safety check, then LLM tagging, then the pattern check, so caregiver notes behave exactly like the parent's.
-- **Public page:** `routes/publicPlaybook.ts` serves server-rendered HTML at `/p/:token` and accepts notes at `POST /p/:token/log`. It lives outside `/v1` and needs no auth; the link is the key.
+- **Public page:** `routes/publicPlaybook.ts` serves server-rendered HTML at `/p/:token` and accepts notes at `POST /p/:token/log` (optional `winId` to count a quick note as a try). It lives outside `/v1` and needs no auth; the link is the key.
 - **Link host:** set by `PUBLIC_BASE_URL`. If that's empty it uses `https://<NGROK_DOMAIN>`, then `http://localhost:<PORT>`, so links work from other phones during development. ngrok's free plan shows its own warning page the first time a browser opens a link. A real deployment wouldn't have this.
 
 | File | Role |
@@ -583,6 +622,7 @@ All routes live under `/v1`, take and return JSON validated with zod, and need a
 - **Profile:** `GET|PATCH|DELETE /me` (DELETE hard-deletes everything through cascades), `PUT /me/goals`, `POST|PATCH|DELETE /children[/:id]`
 - **Goals:** `GET /goals`, `GET /goals/:slug` (locked wins return only their title), `GET /advisors`, `POST|DELETE /subscription` (fake)
 - **Story:** `GET|POST /moments`, `DELETE /moments/:id`, `GET /patterns`, `POST /patterns/generate`
+- **Progress:** `POST /tries` (start or reuse an open try), `POST /tries/:id/outcome` (`helped`, `somewhat` or `didnt`, plus an optional note that becomes a moment), `GET /progress` (per-goal counts, recent outcomes, trend, per-win counts, open tries)
 - **Chat:** `GET /chat`, `DELETE /chat` (starts a fresh conversation; bookmarked replies are kept), `GET /chat/starters`, `GET /chat/topics`, `POST /chat/messages` (SSE: `meta` → `delta`* → `done`), feedback and bookmark routes, `GET /bookmarks`
 - **Notifications:** `GET /notifications?today=YYYY-MM-DD` (inbox; hides tips dated after the device's today), `GET /notifications/upcoming?from=YYYY-MM-DD&days=1-3` (creates and returns the next days' tips for on-device scheduling; `from` must be within a day of the server's date), `POST /notifications/:id/read`
 - **Family playbook:** `GET /playbook`, `PUT /playbook/wins`, `POST /caregivers` (returns the link and a ready-to-send message), `DELETE /caregivers/:id` (turns the link off). Public, no auth: `GET /p/:token` (HTML page), `POST /p/:token/log`.

@@ -14,13 +14,13 @@ function winLine(g: GoalSummary, subscribed: boolean) {
 }
 
 /** Full-width card for a goal the parent chose. The tint carries the category. */
-export function FeaturedGoalCard({ goal, subscribed }: { goal: GoalSummary; subscribed: boolean }) {
+export function FeaturedGoalCard({ goal, subscribed, progress }: { goal: GoalSummary; subscribed: boolean; progress?: string | null }) {
   const tone = categoryColor[goal.category];
   return (
     <Pressable
       onPress={() => open(goal.slug)}
       accessibilityRole="button"
-      accessibilityLabel={`${goal.title}. ${goal.subtitle}. ${winLine(goal, subscribed)}`}
+      accessibilityLabel={`${goal.title}. ${goal.subtitle}. ${winLine(goal, subscribed)}${progress ? `. ${progress}` : ""}`}
       style={({ pressed, focused }: PState) => [
         {
           flexDirection: "row",
@@ -48,6 +48,11 @@ export function FeaturedGoalCard({ goal, subscribed }: { goal: GoalSummary; subs
             {winLine(goal, subscribed)}
           </T>
         </View>
+        {progress ? (
+          <T variant="smallStrong" color={tone.deep}>
+            {progress}
+          </T>
+        ) : null}
       </View>
       <GoalArt illustration={goal.illustration} category={goal.category} size={104} />
     </Pressable>

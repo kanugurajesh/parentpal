@@ -1,57 +1,99 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Linking, Pressable, View } from "react-native";
-import type { Win } from "@parentpal/shared";
+import type { Win, WorkedOutcome } from "@parentpal/shared";
 import { GoalArt } from "@/components/GoalArt";
 import { Icon } from "@/components/Icon";
+import { AdviceNote, OutcomePicker, ProgressCard } from "@/components/Progress";
 import { Button, ErrorNote, IconButton, Loading, Screen, T } from "@/components/ui";
 import { api } from "@/lib/api";
-import { addCheckIn, hasPermission, NOTIFICATIONS_SUPPORTED, setAccountNotifications, turnOnNotifications, updatePrefs, useNotificationState } from "@/lib/notifications";
+import {
+  addCheckIn,
+  hasPermission,
+  NOTIFICATIONS_SUPPORTED,
+  removeCheckIn,
+  setAccountNotifications,
+  turnOnNotifications,
+  updatePrefs,
+  useNotificationState,
+} from "@/lib/notifications";
 import { useSession } from "@/lib/session";
 import { categoryColor, color, radius, space } from "@/theme/tokens";
 
-/** Commits to trying a win; the next morning a check-in asks how it went (and opens the moment log). */
+/**
+ * Commits to trying a win. The try is saved on the server (so progress works everywhere); where the
+ * phone can show notifications, a check-in also asks the next morning how it went.
+ */
 function TryThis({ win, goalSlug }: { win: Win; goalSlug: string }) {
-  const { prefs, checkIns } = useNotificationState();
+  const qc = useQueryClient();
+  const { prefs } = useNotificationState();
   const { me, refreshMe } = useSession();
-  // With the account switch off nothing is scheduled, so a pending check-in would never arrive.
-  const accountOn = me?.user.notificationsEnabled !== false;
-  if (!NOTIFICATIONS_SUPPORTED) return null;
-  if (accountOn && checkIns.some((c) => c.winId === win.id)) {
+  const openTryId = win.mine?.openTryId ?? null;
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["goal", goalSlug] }), qc.invalidateQueries({ queryKey: ["progress"] })]);
+
+  const start = useMutation({
+    mutationFn: async () => {
+      const t = await api.startTry(win.id);
+      await refresh();
+      if (!NOTIFICATIONS_SUPPORTED) return;
+      // With the account switch off nothing is scheduled, so a pending check-in would never arrive.
+      const accountOn = me?.user.notificationsEnabled !== false;
+      if (!accountOn || !prefs.enabled || !prefs.checkIns || !(await hasPermission())) {
+        const on = await turnOnNotifications({
+          title: "Check in tomorrow?",
+          message: "We'll send one reminder tomorrow morning asking how it went. You can also tap how it went right here, any time.",
+          confirmLabel: "Remind me",
+          cancelLabel: "Not now",
+          icon: "bell",
+        });
+        if (!on) return;
+        if (!prefs.checkIns) await updatePrefs({ checkIns: true });
+        if (!accountOn) {
+          await setAccountNotifications(true);
+          await refreshMe();
+        }
+      }
+      await addCheckIn(win, goalSlug, t.id);
+    },
+  });
+
+  const report = useMutation({
+    mutationFn: async (outcome: WorkedOutcome) => {
+      await api.reportOutcome(openTryId!, { outcome });
+      await removeCheckIn({ winId: win.id });
+      await refresh();
+    },
+  });
+
+  if (openTryId) {
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.xs }} accessibilityLiveRegion="polite">
-        <Icon name="check" size={20} color={color.moss} />
-        <T variant="smallStrong" color={color.moss}>
-          Good luck! We'll check in tomorrow morning.
-        </T>
+      <View style={{ gap: space.sm, backgroundColor: color.mossTint, borderRadius: radius.inner, padding: space.md }} accessibilityLiveRegion="polite">
+        <T variant="smallStrong">You're trying this. Once you have, how did it go?</T>
+        <OutcomePicker onPick={(o) => report.mutate(o)} disabled={report.isPending} />
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push({ pathname: "/moment/new", params: { tried: win.title, tryId: openTryId, goal: goalSlug } })}
+        >
+          <T variant="small" color={color.moss} style={{ textDecorationLine: "underline" }}>
+            Add a note about what happened
+          </T>
+        </Pressable>
+        {report.error ? <ErrorNote message={(report.error as Error).message} /> : null}
       </View>
     );
   }
   return (
-    <Button
-      label="I'll try this"
-      kind="secondary"
-      icon="check"
-      accessibilityHint="Sends one reminder tomorrow morning to ask how it went"
-      onPress={async () => {
-        if (!accountOn || !prefs.enabled || !prefs.checkIns || !(await hasPermission())) {
-          const on = await turnOnNotifications({
-            title: "Check in tomorrow?",
-            message: "We'll send one reminder tomorrow morning asking how it went, so you can note it in a line. Those notes are how ParentPal spots patterns.",
-            confirmLabel: "Remind me",
-            cancelLabel: "Not now",
-            icon: "bell",
-          });
-          if (!on) return;
-          if (!prefs.checkIns) await updatePrefs({ checkIns: true });
-          if (!accountOn) {
-            await setAccountNotifications(true);
-            await refreshMe();
-          }
-        }
-        await addCheckIn(win, goalSlug);
-      }}
-    />
+    <>
+      <Button
+        label="I'll try this"
+        kind="secondary"
+        icon="check"
+        loading={start.isPending}
+        accessibilityHint="Tracks this win so you can say how it went"
+        onPress={() => start.mutate()}
+      />
+      {start.error ? <ErrorNote message={(start.error as Error).message} /> : null}
+    </>
   );
 }
 
@@ -105,6 +147,30 @@ function WinCard({ win, accent, goalSlug }: { win: Win; accent: string; goalSlug
         </T>
         <T color={color.inkSoft}>{win.whatToExpect}</T>
       </View>
+      {win.mine?.tried ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <Icon name="check" size={18} color={color.moss} />
+          <T variant="smallStrong" color={color.moss}>
+            You tried this {win.mine.tried}× · helped {win.mine.helped}
+          </T>
+        </View>
+      ) : null}
+      {win.mine?.advice ? (
+        <AdviceNote
+          advice={win.mine.advice}
+          action={
+            win.mine.advice.kind === "ask" ? (
+              <Button
+                label="Ask ParentPal"
+                kind="ghost"
+                icon="ask"
+                onPress={() => router.navigate({ pathname: "/(tabs)/ask", params: { topic: goalSlug } })}
+                style={{ alignSelf: "flex-start" }}
+              />
+            ) : undefined
+          }
+        />
+      ) : null}
       {win.community ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, backgroundColor: color.mossTint, borderRadius: radius.inner, padding: space.md }}>
           <Icon name="people" size={20} color={color.moss} />
@@ -144,6 +210,8 @@ export default function GoalScreen() {
   const g = goal.data;
   const tone = g ? categoryColor[g.category] : categoryColor.emotion;
   const locked = g?.wins.filter((w) => w.locked).length ?? 0;
+  const progress = useQuery({ queryKey: ["progress"], queryFn: () => api.progress() });
+  const mine = progress.data?.goals.find((p) => p.goalSlug === slug);
 
   return (
     <Screen>
@@ -167,6 +235,7 @@ export default function GoalScreen() {
 
           {g.hasContent ? (
             <>
+              {mine?.tried ? <ProgressCard progress={mine} /> : null}
               <View style={{ gap: space.md }}>
                 <T variant="h2" accessibilityRole="header">
                   {g.wins.length} wins to try

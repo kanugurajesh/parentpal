@@ -178,10 +178,19 @@ export async function hasPermission() {
 
 /* ---------------- Check-ins ---------------- */
 
-export async function addCheckIn(win: { id: string; title: string }, goalSlug: string) {
+/** The outcome was reported in the app, so tomorrow's "How did it go?" would only repeat the question. */
+export async function removeCheckIn(match: { winId?: string; tryId?: string }) {
+  await load();
+  const hit = (c: CheckIn) => (match.winId !== undefined && c.winId === match.winId) || (match.tryId !== undefined && c.tryId === match.tryId);
+  if (!state.checkIns.some(hit)) return;
+  await saveCheckIns(state.checkIns.filter((c) => !hit(c)));
+  await syncNotifications();
+}
+
+export async function addCheckIn(win: { id: string; title: string }, goalSlug: string, tryId?: string) {
   await load();
   const dueDate = addDaysISO(localDateISO(), 1);
-  await saveCheckIns([...state.checkIns.filter((c) => c.winId !== win.id), { winId: win.id, winTitle: win.title, goalSlug, dueDate }]);
+  await saveCheckIns([...state.checkIns.filter((c) => c.winId !== win.id), { winId: win.id, winTitle: win.title, goalSlug, tryId, dueDate }]);
   await syncNotifications();
 }
 
@@ -279,7 +288,7 @@ export function useNotificationTaps(active: boolean) {
       if (data.goalSlug) router.push({ pathname: "/goal/[slug]", params: { slug: data.goalSlug } });
       else router.navigate("/(tabs)/notifications");
     } else if (data?.kind === "checkin") {
-      router.push({ pathname: "/moment/new", params: { tried: data.winTitle } });
+      router.push({ pathname: "/moment/new", params: { tried: data.winTitle, ...(data.tryId ? { tryId: data.tryId } : {}) } });
     } else if (data?.kind === "log") {
       router.push("/moment/new");
     }
